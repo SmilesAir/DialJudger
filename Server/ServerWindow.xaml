@@ -14,7 +14,19 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        
+
+        <Menu>
+            <MenuItem Header="_File">
+                <MenuItem Header="_Save"/>
+                <MenuItem Header="S_ave As"/>
+                <MenuItem Header="E_xit" Click="MenuItemExit_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Settings"/>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About"/>
+            </MenuItem>
+        </Menu>
+
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -76,7 +88,7 @@
                 <DataTemplate>
                     <Grid>
                         <Border>
-                            <Grid>
+                            <Grid Background="{Binding DisplayBackgroundColor}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
@@ -105,6 +117,8 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
+
+            <Button Content="{Binding StartButtonText}" Click="StartButton_Click"/>
 
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>

@@ -157,6 +157,10 @@ namespace Client
 					DialIncrementValue = 1f;
 					break;
 			}
+
+			NotifyPropertyChanged("DisplayDialSpeedSlowChecked");
+			NotifyPropertyChanged("DisplayDialSpeedMediumChecked");
+			NotifyPropertyChanged("DisplayDialSpeedFastChecked");
 		}
 		#endregion
 
@@ -265,6 +269,7 @@ namespace Client
 			NetworkComms.AppendGlobalConnectionCloseHandler(OnConnectionClosed);
 
 			NetworkComms.AppendGlobalIncomingPacketHandler<string>("BroadcastServerInfo", HandleBroadcastServerInfo);
+			NetworkComms.AppendGlobalIncomingPacketHandler<string>("ServerStartRoutine", HandleStartRoutine);
 		}
 
 		private static void HandleBroadcastServerInfo(PacketHeader header, Connection connection, string serverInfo)
@@ -273,6 +278,16 @@ namespace Client
 			ClientWindow.ServerPort = int.Parse(serverInfo.Split(':').Last());
 
 			NetworkComms.SendObject("ClientConnect", ClientWindow.ServerIp, ClientWindow.ServerPort, ClientWindow.ClientId);
+		}
+
+		private static void HandleStartRoutine(PacketHeader header, Connection connection, string startParams)
+		{
+			ClientWindow.SetDialSpeed(EDialSpeed.Fast);
+		}
+
+		private static void HandleSetTeam(PacketHeader header, Connection connection, string startParams)
+		{
+			ClientWindow.SetDialSpeed(EDialSpeed.Fast);
 		}
 
 		private void BroadcastFindServer()

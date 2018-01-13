@@ -27,16 +27,27 @@ namespace Server
 	/// <summary>
 	/// Interaction logic for MainWindow.xaml
 	/// </summary>
-	public partial class MainWindow : Window
+	public partial class MainWindow : Window, INotifyPropertyChanged
 	{
 		static string ListeningUrl = "";
 		static public ClientList Clients = new ClientList();
 		static SaveData SaveDataInst = new SaveData();
 		static float RoutineLengthMinutes = 3f;
+		TeamData CurrentPlayingTeam = null;
 
 		public string NowPlayingString
 		{
-			get { return "Does this wokr?"; }
+			get
+			{
+				if (CurrentPlayingTeam != null)
+				{
+					return CurrentPlayingTeam.TeamNames;
+				}
+				else
+				{
+					return "Need To Set Playing Team";
+				}
+			}
 		}
 		public string TimeRemainingString
 		{
@@ -48,6 +59,19 @@ namespace Server
 			set
 			{
 				float.TryParse(value, out RoutineLengthMinutes);
+			}
+		}
+		public string StartButtonText
+		{
+			get { return "Click on First Throw"; }
+		}
+
+		public event PropertyChangedEventHandler PropertyChanged;
+		private void NotifyPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] String propertyName = "")
+		{
+			if (PropertyChanged != null)
+			{
+				PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
 			}
 		}
 
@@ -70,6 +94,11 @@ namespace Server
 			td.PlayerNames.Add("Ryan Young");
 			td.PlayerNames.Add("James Wiseman");
 			SaveDataInst.TeamList.Add(td);
+			td = new TeamData();
+			td.PlayerNames.Add("Jake Gauthier");
+			td.PlayerNames.Add("Arthur Coddington");
+			SaveDataInst.TeamList.Add(td);
+			SetPlayingTeam(SaveDataInst.TeamList[0]);
 
 			Connection.StartListening(ConnectionType.UDP, new IPEndPoint(IPAddress.Any, 10000));
 
@@ -131,7 +160,48 @@ namespace Server
 
 		private void SetPlayingTeam_Click(object sender, RoutedEventArgs e)
 		{
+			Button button = sender as Button;
+			TeamData td = button.Tag as TeamData;
 
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			{
+				SetPlayingTeam(td);
+			}));
+		}
+
+		private void SetPlayingTeam(TeamData playingTeam)
+		{
+			CurrentPlayingTeam = playingTeam;
+
+			foreach (TeamData td in SaveDataInst.TeamList)
+			{
+				td.IsPlaying = td == playingTeam;
+			}
+
+			//foreach (Connection connection in NetworkComms.GetExistingConnection())
+			//{
+			//	connection.SendObject("ServerSetPlayingTeam", playingTeam);
+			//}
+
+			NotifyPropertyChanged("NowPlayingString");
+		}
+
+		private void MenuItemExit_Click(object sender, RoutedEventArgs e)
+		{
+			this.Close();
+		}
+
+		private void StartButton_Click(object sender, RoutedEventArgs e)
+		{
+			StartRoutine();
+		}
+
+		void StartRoutine()
+		{
+			foreach (Connection connection in NetworkComms.GetExistingConnection())
+			{
+				connection.SendObject("ServerStartRoutine", "");
+			}
 		}
 	}
 
@@ -158,7 +228,6 @@ namespace Server
 		public string JudgeValue { get { return LastJudgeValue.ToString("0.0"); } }
 
 		public event PropertyChangedEventHandler PropertyChanged;
-
 		private void NotifyPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] String propertyName = "")
 		{
 			if (PropertyChanged != null)
@@ -237,8 +306,17 @@ namespace Server
 		}
 	}
 
-	public class TeamData
+	public class TeamData : INotifyPropertyChanged
 	{
+		public event PropertyChangedEventHandler PropertyChanged;
+		private void NotifyPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] String propertyName = "")
+		{
+			if (PropertyChanged != null)
+			{
+				PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+			}
+		}
+
 		public ObservableCollection<string> PlayerNames = new ObservableCollection<string>();
 		public string TeamNames
 		{
@@ -275,6 +353,21 @@ namespace Server
 		public string RankString
 		{
 			get { return Rank != 0 ? Rank.ToString() : "N/A"; }
+		}
+		bool isPlaying = false;
+		public bool IsPlaying
+		{
+			get { return isPlaying; }
+			set
+			{
+				isPlaying = value;
+				NotifyPropertyChanged("IsPlaying");
+				NotifyPropertyChanged("DisplayBackgroundColor");
+			}
+		}
+		public Brush DisplayBackgroundColor
+		{
+			get { return IsPlaying ? Brushes.LightGreen : Brushes.White; }
 		}
 	}
 
