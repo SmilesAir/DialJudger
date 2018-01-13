@@ -1,0 +1,133 @@
+﻿<Window x:Class="Server.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Server"
+        mc:Ignorable="d"
+        Title="Server" Height="800" Width="1200"
+        Loaded="Window_Loaded"
+        Closed="Window_Closed">
+    <Grid Name="TopLevelGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Label Content="Teams" HorizontalAlignment="Center"/>
+                <TextBox Grid.Row="1" Name="TeamsTextBox" AcceptsReturn="True"/>
+            </Grid>
+
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Label Content="Results" HorizontalAlignment="Center"/>
+                <TextBox Grid.Row="1" Name="ResultsTextBox" AcceptsReturn="True"/>
+            </Grid>
+
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Label Content="Clients" HorizontalAlignment="Center"/>
+                <ItemsControl Grid.Row="1" Name="JudgesControl" HorizontalContentAlignment="Stretch">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Border>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Label Content="{Binding JudgeName}"/>
+                                        <Label Grid.Column="1" Content="{Binding JudgeValue}"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </Grid>
+
+        <ItemsControl Grid.Row="1" Name="TeamsControl" HorizontalContentAlignment="Stretch">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <Border>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Button Content="Set Playing" Tag="{Binding}" Click="SetPlayingTeam_Click"/>
+                                <Label Grid.Column="1" Content="{Binding TeamNames}"/>
+                                <Label Grid.Column="2" Content="Total Points:" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                <Label Grid.Column="3" Content="{Binding ScoreString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                <Label Grid.Column="4" Content="Rank:" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                <Label Grid.Column="5" Content="{Binding RankString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Label Content="Now Playing:"/>
+                <Label Grid.Column="1" Content="{Binding NowPlayingString}"/>
+                <Label Grid.Row="1" Content="Time Remaining:"/>
+                <Label Grid.Row="1" Grid.Column="1" Content="{Binding TimeRemainingString}"/>
+                <Label Grid.Row="2" Grid.ColumnSpan="2" Background="LightGray" Content="Settings" HorizontalContentAlignment="Center"/>
+                <Label Grid.Row="3" Content="Routine Length Minutes:"/>
+                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding RoutineLengthString, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="False"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>
