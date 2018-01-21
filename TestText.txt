@@ -8,6 +8,4 @@ Bob Boulware, General
 Randy Silvey, Difficulty
 
 
-Stop button
 Background text for Teams and Judges import instruction
-

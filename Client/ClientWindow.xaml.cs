@@ -36,8 +36,7 @@ namespace Client
 	{
 		System.Timers.Timer BroadcastTimer = new System.Timers.Timer();
 		System.Timers.Timer SendScoreTimer = new System.Timers.Timer();
-		System.Timers.Timer FinishRoutineTimer = new System.Timers.Timer();
-		System.Timers.Timer UpdateRoutineTimeTimer = new System.Timers.Timer();
+		RoutineTimers RoutineTimer = new RoutineTimers(() => ClientWindow.FinishRoutine(), () => ClientWindow.OnUpdateRoutine());
 		bool bIsConnected = false;
 		public bool IsConnected
 		{
@@ -101,24 +100,18 @@ namespace Client
 			set
 			{
 				routineLengthMinutes = value;
+				RoutineTimer.RoutineLengthMinutes = value;
+
 				NotifyPropertyChanged("RoutineLengthMinutes");
 				NotifyPropertyChanged("DisplayTimeString");
 			}
 		}
-		public bool IsJudging { get { return FinishRoutineTimer.Enabled; } }
-		DateTime StartRoutineTime;
-		public double SecondsFromRoutineStart { get { return (DateTime.Now - StartRoutineTime).TotalSeconds; } }
+		public bool IsJudging { get { return RoutineTimer.IsRoutinePlaying; } }
 		public string DisplayTimeString
 		{
 			get
 			{
-				int secondsRemaining = (int)(Math.Round(RoutineLengthMinutes * 60));
-				if (IsJudging)
-				{
-					secondsRemaining = (int)(Math.Round(RoutineLengthMinutes * 60 - SecondsFromRoutineStart));
-				}
-
-				return string.Format("Time Remaining: {0:0}:{1:00}", secondsRemaining / 60, secondsRemaining % 60);
+				return "Time Remaining: " + RoutineTimer.RemainingTimeString;
 			}
 		}
 		public DialRoutineScoreData RoutineScore = new DialRoutineScoreData();
@@ -129,7 +122,7 @@ namespace Client
 				float additionalSeconds = 0f;
 				if (IsJudging && RoutineScore.DialInputs.Count > 0)
 				{
-					additionalSeconds = (float)(SecondsFromRoutineStart - RoutineScore.DialInputs.Last().TimeSeconds);
+					additionalSeconds = (float)(RoutineTimer.ElapsedSeconds - RoutineScore.DialInputs.Last().TimeSeconds);
 				}
 				return "Total Score: " + RoutineScore.GetTotalScore(additionalSeconds).ToString("0.0");
 			}
@@ -288,21 +281,9 @@ namespace Client
 			SendScoreTimer.AutoReset = true;
 			SendScoreTimer.Elapsed += SendScoreTimer_Elapsed;
 			SendScoreTimer.Start();
-
-			UpdateRoutineTimeTimer.AutoReset = true;
-			UpdateRoutineTimeTimer.Interval = 1000;
-			UpdateRoutineTimeTimer.Elapsed += UpdateRoutineTimeTimer_Elapsed;
-
-			FinishRoutineTimer.AutoReset = false;
-			FinishRoutineTimer.Elapsed += FinishRoutineTimer_Elapsed;
 		}
 
-		private void FinishRoutineTimer_Elapsed(object sender, ElapsedEventArgs e)
-		{
-			FinishRoutine();
-		}
-
-		private void UpdateRoutineTimeTimer_Elapsed(object sender, ElapsedEventArgs e)
+		void OnUpdateRoutine()
 		{
 			NotifyPropertyChanged("DisplayTimeString");
 			NotifyPropertyChanged("TotalScoreString");
@@ -371,6 +352,7 @@ namespace Client
 			NetworkComms.AppendGlobalIncomingPacketHandler<InitRoutineData>("ServerStartRoutine", HandleStartRoutine);
 			NetworkComms.AppendGlobalIncomingPacketHandler<InitRoutineData>("ServerSetPlayingTeam", HandleSetPlayingTeam);
 			NetworkComms.AppendGlobalIncomingPacketHandler<JudgeData>("ServerSetJudgeInfo", HandleSetJudgeInfo);
+			NetworkComms.AppendGlobalIncomingPacketHandler<string>("ServerCancelRoutine", HandleCancelRoutine);
 		}
 
 		private static void HandleBroadcastServerInfo(PacketHeader header, Connection connection, string serverInfo)
@@ -403,8 +385,19 @@ namespace Client
 
 		private static void HandleSetJudgeInfo(PacketHeader header, Connection connection, JudgeData judgeData)
 		{
-			ClientWindow.JudgeName = judgeData.JudgeName;
-			ClientWindow.JudgeCategory = judgeData.Category;
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			{
+				ClientWindow.JudgeName = judgeData.JudgeName;
+				ClientWindow.JudgeCategory = judgeData.Category;
+			}));
+		}
+
+		private static void HandleCancelRoutine(PacketHeader header, Connection connection, string param)
+		{
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			{
+				ClientWindow.CancelRoutine();
+			}));
 		}
 
 		private void BroadcastFindServer()
@@ -445,29 +438,23 @@ namespace Client
 
 			if (IsJudging)
 			{
-				RoutineScore.DialInputs.Add(new DialInputData(DialValue, (float)SecondsFromRoutineStart));
+				RoutineScore.DialInputs.Add(new DialInputData(DialValue, (float)RoutineTimer.ElapsedSeconds));
 			}
 		}
 
 		private void StartRoutine()
 		{
 			DialValue = 0f;
-			StartRoutineTime = DateTime.Now;
 			RoutineScore.DialInputs.Clear();
 			RoutineScore.JudgeName = JudgeName;
 			RoutineScore.PlayerNames = TeamName;
 
-			FinishRoutineTimer.Interval = routineLengthMinutes * 60 * 1000;
-			FinishRoutineTimer.Start();
-
-			UpdateRoutineTimeTimer.Start();
+			RoutineTimer.StartRoutine(RoutineLengthMinutes);
 		}
 
 		private void FinishRoutine()
 		{
-			UpdateRoutineTimeTimer.Stop();
-
-			RoutineScore.DialInputs.Add(new DialInputData(DialValue, (float)SecondsFromRoutineStart));
+			RoutineScore.DialInputs.Add(new DialInputData(DialValue, (float)RoutineTimer.ElapsedSeconds));
 
 			CreateBackup();
 
@@ -482,6 +469,10 @@ namespace Client
 
 		private void CancelRoutine()
 		{
+			RoutineTimer.StopRoutine();
+
+			DialValue = 0f;
+			RoutineScore.DialInputs.Clear();
 		}
 
 		public void CreateBackup()
@@ -493,8 +484,8 @@ namespace Client
 					Directory.CreateDirectory("DialJudgerClientBackups");
 				}
 
-				string filename = "DialJudgerClientBackups\\" + RoutineScore.JudgeName + "-" + RoutineScore.PlayerNames + "-" +
-					DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss") + ".txt";
+				string filename = "DialJudgerClientBackups\\" + RoutineScore.JudgeName + "_" + RoutineScore.PlayerNames + "_" +
+					RoutineScore.GetScoreString() + "_" + DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss") + ".txt";
 
 				XmlSerializer serializer = new XmlSerializer(typeof(DialRoutineScoreData));
 				using (StringWriter retString = new StringWriter())

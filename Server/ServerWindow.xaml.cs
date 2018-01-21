@@ -36,8 +36,35 @@ namespace Server
 		static public ClientList Clients = new ClientList();
 		SaveData SaveDataInst = new SaveData();
 		public string SaveFilename = "DialJudgerServerSave.txt";
-		static float RoutineLengthMinutes = .1f;
-		public TeamData CurrentPlayingTeam = null;
+		float routineLengthMinutes = .1f;
+		public float RoutineLengthMinutes
+		{
+			get { return routineLengthMinutes; }
+			set
+			{
+				routineLengthMinutes = value;
+				RoutineTimer.RoutineLengthMinutes = value;
+
+				NotifyPropertyChanged("RoutineLengthMinutes");
+			}
+		}
+		TeamData currentPlayingTeam = null;
+		public TeamData CurrentPlayingTeam
+		{
+			get { return currentPlayingTeam; }
+			set
+			{
+				currentPlayingTeam = value;
+
+				NotifyPropertyChanged("NowPlayingString");
+				NotifyPropertyChanged("StartButtonText");
+			}
+		}
+		RoutineTimers RoutineTimer = new RoutineTimers(() => ServerWindow.OnFinishRoutineTimer(), () => ServerWindow.OnUpdateRoutineTimer());
+		int CancelRoutineClickCount = 0;
+		float CancelRoutineTimeLimit = .4f;
+		DateTime CancelRoutineClickTime;
+		float StartAfterCancelTimeLimit = .75f;
 
 		public string NowPlayingString
 		{
@@ -55,7 +82,7 @@ namespace Server
 		}
 		public string TimeRemainingString
 		{
-			get { return "1:53"; }
+			get { return RoutineTimer.RemainingTimeString; }
 		}
 		string routineLengthMinutesString = "";
 		public string RoutineLengthString
@@ -77,9 +104,27 @@ namespace Server
 				NotifyPropertyChanged("RoutineLengthString");
 			}
 		}
+		public bool IsJudging
+		{
+			get { return RoutineTimer.IsRoutinePlaying; }
+		}
 		public string StartButtonText
 		{
-			get { return "Click on First Throw"; }
+			get
+			{
+				if (CurrentPlayingTeam == null)
+				{
+					return "Set Playing Team";
+				}
+				else if (IsJudging)
+				{
+					return "Triple Click To Stop Routine";
+				}
+				else
+				{
+					return "Click on First Throw";
+				}
+			}
 		}
 		string resultsText = "";
 		public string ResultsText
@@ -144,6 +189,7 @@ namespace Server
 			Load();
 
 			routineLengthMinutesString = RoutineLengthMinutes.ToString();
+			RoutineLengthMinutes = routineLengthMinutes;
 		}
 
 		private void AppendHandlers()
@@ -262,8 +308,6 @@ namespace Server
 			{
 				connection.SendObject("ServerSetPlayingTeam", routineData);
 			}
-
-			NotifyPropertyChanged("NowPlayingString");
 		}
 
 		private void MenuItemExit_Click(object sender, RoutedEventArgs e)
@@ -273,19 +317,58 @@ namespace Server
 
 		private void StartButton_Click(object sender, RoutedEventArgs e)
 		{
-			StartRoutine();
+			double secondsSinceCancelClick = (DateTime.Now - CancelRoutineClickTime).TotalSeconds;
+
+			if (!IsJudging)
+			{
+				if (secondsSinceCancelClick > StartAfterCancelTimeLimit)
+				{
+					StartRoutine();
+				}
+			}
+			else
+			{
+				if (secondsSinceCancelClick > CancelRoutineTimeLimit)
+				{
+					CancelRoutineClickCount = 0;
+				}
+
+				++CancelRoutineClickCount;
+				CancelRoutineClickTime = DateTime.Now;
+
+				if (CancelRoutineClickCount >= 3)
+				{
+					CancelRoutine();
+				}
+			}
 		}
 
 		void StartRoutine()
 		{
 			if (CurrentPlayingTeam != null)
 			{
+				RoutineTimer.StartRoutine(RoutineLengthMinutes);
+
+				NotifyPropertyChanged("StartButtonText");
+
 				InitRoutineData routineData = new InitRoutineData(CurrentPlayingTeam.PlayerNamesString, RoutineLengthMinutes);
 
 				foreach (Connection connection in NetworkComms.GetExistingConnection())
 				{
 					connection.SendObject("ServerStartRoutine", routineData);
 				}
+			}
+		}
+
+		void CancelRoutine()
+		{
+			RoutineTimer.StopRoutine();
+
+			NotifyPropertyChanged("StartButtonText");
+
+			foreach (Connection connection in NetworkComms.GetExistingConnection())
+			{
+				connection.SendObject("ServerCancelRoutine", "");
 			}
 		}
 
@@ -492,6 +575,16 @@ namespace Server
 		private void SaveButton_Click(object sender, RoutedEventArgs e)
 		{
 			Save();
+		}
+
+		public void OnFinishRoutineTimer()
+		{
+			NotifyPropertyChanged("TimeRemainingString");
+		}
+
+		public void OnUpdateRoutineTimer()
+		{
+			NotifyPropertyChanged("TimeRemainingString");
 		}
 	}
 

@@ -148,7 +148,7 @@ namespace CommonClasses
 
 		public abstract string GetScoreString();
 
-		public abstract bool IsSameInstance<T>(T other) where T: BaseRoutineScoreData;
+		public abstract bool IsSameInstance<T>(T other) where T : BaseRoutineScoreData;
 	}
 
 	public enum ECategory
@@ -261,6 +261,90 @@ namespace CommonClasses
 		public override bool IsSameInstance<T>(T other)
 		{
 			return other.JudgeName == JudgeName && other.PlayerNames == PlayerNames;
+		}
+	}
+
+	public class RoutineTimers
+	{
+		System.Timers.Timer FinishRoutineTimer = new System.Timers.Timer();
+		System.Timers.Timer UpdateRoutineTimeTimer = new System.Timers.Timer();
+		Action FinishCallback;
+		Action UpdateCallback;
+		DateTime StartRoutineTime;
+		public float RoutineLengthMinutes = 0f;
+
+		public bool IsRoutinePlaying
+		{
+			get { return FinishRoutineTimer.Enabled; }
+		}
+		public double ElapsedSeconds
+		{
+			get { return (DateTime.Now - StartRoutineTime).TotalSeconds; }
+		}
+		public double RemainingSeconds
+		{
+			get
+			{
+				if (IsRoutinePlaying)
+				{
+					return RoutineLengthMinutes * 60f - ElapsedSeconds;
+				}
+
+				return 0f;
+			}
+		}
+		public string RemainingTimeString
+		{
+			get
+			{
+				double remainingSeconds = IsRoutinePlaying ? RemainingSeconds : RoutineLengthMinutes * 60f;
+				return string.Format("{0:0}:{1:00}", remainingSeconds / 60, remainingSeconds % 60);
+			}
+		}
+
+		public RoutineTimers(Action finishCallback, Action updateCallback)
+		{
+			FinishCallback = finishCallback;
+			UpdateCallback = updateCallback;
+
+			FinishRoutineTimer.AutoReset = false;
+			FinishRoutineTimer.Elapsed += FinishRoutineTimer_Elapsed;
+
+			UpdateRoutineTimeTimer.Interval = 1000;
+			UpdateRoutineTimeTimer.AutoReset = true;
+			UpdateRoutineTimeTimer.Elapsed += UpdateRoutineTimeTimer_Elapsed;
+		}
+
+		private void UpdateRoutineTimeTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+		{
+			UpdateCallback();
+		}
+
+		private void FinishRoutineTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+		{
+			UpdateRoutineTimeTimer.Stop();
+
+			FinishCallback();
+		}
+
+		public void StartRoutine(float routineLengthMinutes)
+		{
+			RoutineLengthMinutes = routineLengthMinutes;
+
+			FinishRoutineTimer.Interval = routineLengthMinutes * 60f * 1000f;
+			FinishRoutineTimer.Start();
+
+			UpdateRoutineTimeTimer.Start();
+
+			StartRoutineTime = DateTime.Now;
+		}
+
+		public void StopRoutine()
+		{
+			FinishRoutineTimer.Stop();
+			UpdateRoutineTimeTimer.Stop();
+
+			UpdateCallback();
 		}
 	}
 }
