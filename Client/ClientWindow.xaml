@@ -12,27 +12,56 @@
         Deactivated="Window_Deactivated">
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height=".5*"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Viewbox HorizontalAlignment="Left">
+        <Menu>
+            <MenuItem Header="_File">
+                <MenuItem Header="_Send Backup" Click="SendBackupButton_Click"/>
+                <MenuItem Header="E_xit"/>
+            </MenuItem>
+        </Menu>
+
+        <Viewbox Grid.Row="1" HorizontalAlignment="Left">
             <Label Content="{Binding DisplayJudgeName}"/>
         </Viewbox>
 
-        <Viewbox Grid.Row="1" HorizontalAlignment="Left">
+        <Viewbox Grid.Row="2" HorizontalAlignment="Left">
             <Label Content="{Binding DisplayTeamName}"/>
         </Viewbox>
 
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <Viewbox HorizontalAlignment="Left">
+                <Label Content="{Binding DisplayCategoryName}"/>
+            </Viewbox>
+
+            <Viewbox Grid.Column="1" HorizontalAlignment="Right">
+                <Label Content="{Binding DisplayTimeString}"/>
+            </Viewbox>
+
+            <Viewbox Grid.Column="2" HorizontalAlignment="Right">
+                <Label Content="{Binding TotalScoreString}"/>
+            </Viewbox>
+        </Grid>
+
+        <Grid Grid.Row="4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            
-                <Slider Name="ValueSlider" Value="{Binding DialValue}" VerticalAlignment="Center"
+
+            <Slider Name="ValueSlider" Value="{Binding SliderValue}" VerticalAlignment="Center"
                         IsSnapToTickEnabled="True" TickFrequency=".1" Minimum="0" Maximum="10"/>
 
                 <Viewbox Grid.Column="1">
@@ -40,7 +69,7 @@
             </Viewbox>
         </Grid>
 
-        <Grid Grid.Row="3">
+        <Grid Grid.Row="5">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>

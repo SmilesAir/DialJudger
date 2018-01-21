@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -21,6 +22,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using System.Xml.Serialization;
 
 namespace Server
 {
@@ -29,11 +31,13 @@ namespace Server
 	/// </summary>
 	public partial class MainWindow : Window, INotifyPropertyChanged
 	{
+		public static MainWindow ServerWindow = null;
 		static string ListeningUrl = "";
 		static public ClientList Clients = new ClientList();
-		static SaveData SaveDataInst = new SaveData();
-		static float RoutineLengthMinutes = 3f;
-		TeamData CurrentPlayingTeam = null;
+		SaveData SaveDataInst = new SaveData();
+		public string SaveFilename = "DialJudgerServerSave.txt";
+		static float RoutineLengthMinutes = .1f;
+		public TeamData CurrentPlayingTeam = null;
 
 		public string NowPlayingString
 		{
@@ -41,7 +45,7 @@ namespace Server
 			{
 				if (CurrentPlayingTeam != null)
 				{
-					return CurrentPlayingTeam.TeamNames;
+					return CurrentPlayingTeam.PlayerNamesString;
 				}
 				else
 				{
@@ -53,17 +57,40 @@ namespace Server
 		{
 			get { return "1:53"; }
 		}
+		string routineLengthMinutesString = "";
 		public string RoutineLengthString
 		{
-			get { return RoutineLengthMinutes.ToString(); }
+			get { return routineLengthMinutesString; }
 			set
 			{
-				float.TryParse(value, out RoutineLengthMinutes);
+				float newLength = 0;
+				if (float.TryParse(value, out newLength) || value == "." || value == "")
+				{
+					routineLengthMinutesString = value;
+					RoutineLengthMinutes = newLength;
+				}
+				else
+				{
+					routineLengthMinutesString = RoutineLengthMinutes.ToString();
+				}
+
+				NotifyPropertyChanged("RoutineLengthString");
 			}
 		}
 		public string StartButtonText
 		{
 			get { return "Click on First Throw"; }
+		}
+		string resultsText = "";
+		public string ResultsText
+		{
+			get { return resultsText; }
+			set
+			{
+				resultsText = value;
+
+				NotifyPropertyChanged("ResultsText");
+			}
 		}
 
 		public event PropertyChangedEventHandler PropertyChanged;
@@ -77,6 +104,8 @@ namespace Server
 
 		public MainWindow()
 		{
+			ServerWindow = this;
+
 			InitializeComponent();
 		}
 
@@ -90,15 +119,15 @@ namespace Server
 
 			TopLevelGrid.DataContext = this;
 
-			TeamData td = new TeamData();
-			td.PlayerNames.Add("Ryan Young");
-			td.PlayerNames.Add("James Wiseman");
-			SaveDataInst.TeamList.Add(td);
-			td = new TeamData();
-			td.PlayerNames.Add("Jake Gauthier");
-			td.PlayerNames.Add("Arthur Coddington");
-			SaveDataInst.TeamList.Add(td);
-			SetPlayingTeam(SaveDataInst.TeamList[0]);
+			//TeamData td = new TeamData();
+			//td.PlayerNames.Add("Ryan Young");
+			//td.PlayerNames.Add("James Wiseman");
+			//SaveDataInst.TeamList.Add(td);
+			//td = new TeamData();
+			//td.PlayerNames.Add("Jake Gauthier");
+			//td.PlayerNames.Add("Arthur Coddington");
+			//SaveDataInst.TeamList.Add(td);
+			//SetPlayingTeam(SaveDataInst.TeamList[0]);
 
 			Connection.StartListening(ConnectionType.UDP, new IPEndPoint(IPAddress.Any, 10000));
 
@@ -109,8 +138,12 @@ namespace Server
 			Console.WriteLine("Server listening for TCP connection on:");
 			foreach (System.Net.IPEndPoint localEndPoint in Connection.ExistingLocalListenEndPoints(ConnectionType.TCP))
 			{
-				ListeningUrl = TeamsTextBox.Text = localEndPoint.Address + ":" + localEndPoint.Port;
+				ListeningUrl = localEndPoint.Address + ":" + localEndPoint.Port;
 			}
+
+			Load();
+
+			routineLengthMinutesString = RoutineLengthMinutes.ToString();
 		}
 
 		private void AppendHandlers()
@@ -121,6 +154,8 @@ namespace Server
 			NetworkComms.AppendGlobalIncomingPacketHandler<int>("BroadcastFindServer", HandleBroadcastFindServer);
 			NetworkComms.AppendGlobalIncomingPacketHandler<ClientIdData>("ClientConnect", HandleClientConnect);
 			NetworkComms.AppendGlobalIncomingPacketHandler<ScoreUpdateData>("JudgeScoreUpdate", HandleJudgeScoreUpdate);
+			NetworkComms.AppendGlobalIncomingPacketHandler<DialRoutineScoreData>("JudgeFinishedScore", HandleJudgeFinishedScore);
+			NetworkComms.AppendGlobalIncomingPacketHandler<DialRoutineScoreData>("JudgeSendBackupScore", HandleJudgeSendBackupScore);
 		}
 
 		private static void HandleBroadcastFindServer(PacketHeader header, Connection connection, int port)
@@ -132,7 +167,7 @@ namespace Server
 		{
 			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
 			{
-				Clients.Add(connection, clientInfo);
+				Clients.Add(connection, clientInfo, () => ServerWindow.UpdateJudgesForClients());
 			}));
 		}
 
@@ -144,13 +179,57 @@ namespace Server
 			}));
 		}
 
+		private static void HandleJudgeFinishedScore(PacketHeader header, Connection connection, DialRoutineScoreData score)
+		{
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			{
+				ServerWindow.SetTeamScore(ServerWindow.CurrentPlayingTeam, score);
+
+				ServerWindow.TryIncrementPlayingTeam();
+			}));
+		}
+
+		private static void HandleJudgeSendBackupScore(PacketHeader header, Connection connection, DialRoutineScoreData score)
+		{
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			{
+				ServerWindow.SetTeamScore(score);
+			}));
+		}
+
+		public void SetTeamScore(DialRoutineScoreData score)
+		{
+			foreach (TeamData team in SaveDataInst.TeamList)
+			{
+				if (team.PlayerNamesString == score.PlayerNames)
+				{
+					SetTeamScore(team, score);
+				}
+			}
+		}
+
+		public void SetTeamScore(TeamData team, DialRoutineScoreData score)
+		{
+			if (team != null)
+			{
+				team.SetFinishedScore(ServerWindow.SaveDataInst.TeamList, score);
+
+				UpdateResultsText();
+
+				Save();
+			}
+		}
+
 		private static void OnConnectionEstablished(Connection connection)
 		{
 		}
 
 		private static void OnConnectionClosed(Connection connection)
 		{
-			Clients.Remove(connection);
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			{
+				Clients.Remove(connection);
+			}));
 		}
 
 		private void Window_Closed(object sender, EventArgs e)
@@ -178,10 +257,11 @@ namespace Server
 				td.IsPlaying = td == playingTeam;
 			}
 
-			//foreach (Connection connection in NetworkComms.GetExistingConnection())
-			//{
-			//	connection.SendObject("ServerSetPlayingTeam", playingTeam);
-			//}
+			InitRoutineData routineData = new InitRoutineData(playingTeam == null ? "No Team" : playingTeam.PlayerNamesString, RoutineLengthMinutes);
+			foreach (Connection connection in NetworkComms.GetExistingConnection())
+			{
+				connection.SendObject("ServerSetPlayingTeam", routineData);
+			}
 
 			NotifyPropertyChanged("NowPlayingString");
 		}
@@ -198,18 +278,240 @@ namespace Server
 
 		void StartRoutine()
 		{
-			foreach (Connection connection in NetworkComms.GetExistingConnection())
+			if (CurrentPlayingTeam != null)
 			{
-				connection.SendObject("ServerStartRoutine", "");
+				InitRoutineData routineData = new InitRoutineData(CurrentPlayingTeam.PlayerNamesString, RoutineLengthMinutes);
+
+				foreach (Connection connection in NetworkComms.GetExistingConnection())
+				{
+					connection.SendObject("ServerStartRoutine", routineData);
+				}
 			}
+		}
+
+		void UpdateJudgesForClients()
+		{
+			// Parse the Judges text
+
+			//List<JudgeData> newJudges = new List<JudgeData>();
+			//newJudges.Add(new JudgeData("Randy Silvey", ECategory.General));
+			//newJudges.Add(new JudgeData("Bob Boulware", ECategory.General));
+
+			for (int i = 0; i < SaveDataInst.ImportedJudges.Count && i < Clients.Clients.Count; ++i)
+			{
+				JudgeData jd = SaveDataInst.ImportedJudges[i];
+				ClientData cd = Clients.Clients[i];
+
+				cd.Judge = jd;
+
+				cd.ConnectionData.SendObject("ServerSetJudgeInfo", jd);
+			}
+		}
+
+		void UpdateResultsText()
+		{
+			List<TeamData> sortedTeams = new List<TeamData>();
+			foreach (TeamData team in SaveDataInst.TeamList)
+			{
+				if (team.Rank > 0)
+				{
+					if (sortedTeams.Count == 0)
+					{
+						sortedTeams.Add(team);
+					}
+					else
+					{
+						for (int i = 0; i < sortedTeams.Count; ++i)
+						{
+							if (sortedTeams[i].Rank > 0 && team.Rank < sortedTeams[i].Rank)
+							{
+								sortedTeams.Insert(i, team);
+								break;
+							}
+						}
+					}
+				}
+			}
+
+			ResultsText = "";
+
+			foreach (TeamData team in sortedTeams)
+			{
+				ResultsText += team.PlayerNamesString + ", Rank: " + team.RankString + ", Points: " + team.TotalScoreString +
+					", Details: " + team.DetailedJudgeScoresString + "\r\n";
+			}
+		}
+
+		public void TryIncrementPlayingTeam()
+		{
+			var teamList = SaveDataInst.TeamList;
+			for (int i = 0; i < teamList.Count; ++i)
+			{
+				TeamData team = teamList[i];
+				if (CurrentPlayingTeam == team)
+				{
+					if (i < teamList.Count - 1)
+					{
+						SetPlayingTeam(teamList[i + 1]);
+					}
+					else
+					{
+						SetPlayingTeam(null);
+					}
+
+					return;
+				}
+			}
+		}
+
+		void ImportTeamsFromTextbox()
+		{
+			// Check if we are overriding data
+
+			string[] splitters = { ",", "-", "/", "|" };
+			StringReader text = new StringReader(TeamsTextBox.Text);
+
+			SaveDataInst.TeamList.Clear();
+
+			string line = null;
+			while ((line = text.ReadLine()) != null)
+			{
+				TeamData newTeam = new TeamData();
+
+				string[] names = line.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
+				foreach (string name in names)
+				{
+					newTeam.PlayerNames.Add(name.Trim());
+				}
+
+				SaveDataInst.TeamList.Add(newTeam);
+			}
+
+			Save();
+		}
+
+		private void ImportTeamsButton_Click(object sender, RoutedEventArgs e)
+		{
+			ImportTeamsFromTextbox();
+		}
+
+		private void ImportJudgesButton_Click(object sender, RoutedEventArgs e)
+		{
+			ImportJudgesFromTextbox();
+		}
+
+		void ImportJudgesFromTextbox()
+		{
+			// Check if we are overriding data
+
+			string[] splitters = { ",", "-", "/", "|" };
+			StringReader text = new StringReader(JudgesTextBox.Text);
+
+			string line = null;
+			while ((line = text.ReadLine()) != null)
+			{
+				string[] judgeParams = line.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
+
+				bool bImportError = false;
+				if (judgeParams.Length == 2)
+				{
+					ECategory judgeCategory;
+					if (Enum.TryParse<ECategory>(judgeParams[1].Trim(), out judgeCategory))
+					{
+						SaveDataInst.ImportedJudges.Add(new JudgeData(judgeParams[0].Trim(), judgeCategory));
+					}
+					else
+					{
+						// Parse Error
+						bImportError = true;
+					}
+				}
+				else
+				{
+					// Parse Error
+					bImportError = true;
+				}
+
+				if (!bImportError)
+				{
+					UpdateJudgesForClients();
+
+					Save();
+				}
+			}
+		}
+
+		void Save()
+		{
+			try
+			{
+				XmlSerializer serializer = new XmlSerializer(typeof(SaveData));
+				using (StringWriter retString = new StringWriter())
+				{
+					serializer.Serialize(retString, SaveDataInst);
+					using (StreamWriter saveFile = new StreamWriter(SaveFilename))
+					{
+						saveFile.Write(retString.ToString());
+					}
+				}
+			}
+			catch
+			{
+				// Popup error
+			}
+		}
+
+		void Load()
+		{
+			try
+			{
+				if (File.Exists(SaveFilename))
+				{
+					using (StreamReader saveFile = new StreamReader(SaveFilename))
+					{
+						XmlSerializer serializer = new XmlSerializer(typeof(SaveData));
+						SaveDataInst = (SaveData)serializer.Deserialize(saveFile);
+
+						TeamsControl.ItemsSource = SaveDataInst.TeamList;
+
+						foreach (TeamData td in SaveDataInst.TeamList)
+						{
+							td.IsPlaying = false;
+						}
+
+						UpdateJudgesForClients();
+					}
+				}
+			}
+			catch
+			{
+				// Popup error
+			}
+		}
+
+		private void SaveButton_Click(object sender, RoutedEventArgs e)
+		{
+			Save();
 		}
 	}
 
 	public class ClientData : INotifyPropertyChanged
 	{
 		public Connection ConnectionData = null;
-		public ClientIdData Judge = null;
+		public ClientIdData ClientId = null;
 		public RoutineData RoutineScores = new RoutineData();
+		JudgeData judge = null;
+		public JudgeData Judge
+		{
+			get { return judge; }
+			set
+			{
+				judge = value;
+				NotifyPropertyChanged("Judge");
+				NotifyPropertyChanged("JudgeName");
+				NotifyPropertyChanged("JudgeCategory");
+			}
+		}
 		private float lastJudgeValue = CommonValues.InvalidScore;
 		public float LastJudgeValue
 		{
@@ -224,8 +526,10 @@ namespace Server
 		}
 
 		// Display
-		public string JudgeName { get { return Judge == null ? "None" : Judge.DisplayName; } }
+		public string ClientName { get { return ClientId == null ? "None" : ClientId.DisplayName; } }
 		public string JudgeValue { get { return LastJudgeValue.ToString("0.0"); } }
+		public string JudgeName { get { return Judge == null ? "None" : Judge.JudgeName; } }
+		public string JudgeCategory { get { return Judge == null ? "None" : Judge.Category.ToString(); } }
 
 		public event PropertyChangedEventHandler PropertyChanged;
 		private void NotifyPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] String propertyName = "")
@@ -243,7 +547,7 @@ namespace Server
 		public ClientData(Connection connection, ClientIdData id)
 		{
 			ConnectionData = connection;
-			Judge = id;
+			ClientId = id;
 		}
 	}
 
@@ -255,17 +559,25 @@ namespace Server
 		{
 		}
 
-		public void Add(Connection connection, ClientIdData id)
+		public void Add(Connection connection, ClientIdData id, Action onComplete)
 		{
+			int insertIndex = 0;
 			foreach (ClientData cd in Clients)
 			{
-				if (cd.Judge.CompareTo(id))
+				if (cd.ClientId.CompareTo(id))
 				{
 					return;
 				}
+
+				if (id.OptionalNumberId >= cd.ClientId.OptionalNumberId)
+				{
+					++insertIndex;
+				}
 			}
 
-			Clients.Add(new ClientData(connection, id));
+			Clients.Insert(insertIndex, new ClientData(connection, id));
+
+			onComplete();
 		}
 
 		public void Remove(Connection connection)
@@ -286,7 +598,7 @@ namespace Server
 			{
 				if (cd.ConnectionData == connection)
 				{
-					cd.Judge = id;
+					cd.ClientId = id;
 					return;
 				}
 			}
@@ -296,7 +608,7 @@ namespace Server
 		{
 			foreach (ClientData cd in Clients)
 			{
-				if (cd.Judge.CompareTo(scoreUpdate.Judge))
+				if (cd.ClientId.CompareTo(scoreUpdate.Judge))
 				{
 					cd.LastJudgeValue = scoreUpdate.Score.Score;
 
@@ -318,7 +630,7 @@ namespace Server
 		}
 
 		public ObservableCollection<string> PlayerNames = new ObservableCollection<string>();
-		public string TeamNames
+		public string PlayerNamesString
 		{
 			get
 			{
@@ -344,12 +656,18 @@ namespace Server
 				return ret;
 			}
 		}
-		public RoutineScoreData Scores = new RoutineScoreData();
-		public string ScoreString
+		public List<DialRoutineScoreData> Scores = new List<DialRoutineScoreData>();
+		int rank = 0;
+		public int Rank
 		{
-			get { return Scores.ScoreString; }
+			get { return rank; }
+			set
+			{
+				rank = value;
+				NotifyPropertyChanged("Rank");
+				NotifyPropertyChanged("RankString");
+			}
 		}
-		public int Rank = 0;
 		public string RankString
 		{
 			get { return Rank != 0 ? Rank.ToString() : "N/A"; }
@@ -369,11 +687,94 @@ namespace Server
 		{
 			get { return IsPlaying ? Brushes.LightGreen : Brushes.White; }
 		}
+		public float TotalScore
+		{
+			get
+			{
+				float total = 0f;
+				foreach (DialRoutineScoreData score in Scores)
+				{
+					total += score.GetTotalScore();
+				}
+
+				return total;
+			}
+		}
+		public string TotalScoreString { get { return TotalScore.ToString("0.0"); } }
+		public string DetailedJudgeScoresString
+		{
+			get
+			{
+				string ret = "";
+
+				foreach (DialRoutineScoreData score in Scores)
+				{
+					ret += score.JudgeName + ": " + score.GetScoreString() + "  ";
+				}
+
+				return ret;
+			}
+		}
+
+		void UpdateRank(ObservableCollection<TeamData> teamList)
+		{
+			foreach (TeamData team1 in teamList)
+			{
+				float score1Total = team1.TotalScore;
+				int rank = 1;
+				if (score1Total > 0)
+				{
+					foreach (TeamData team2 in teamList)
+					{
+						if (score1Total < team2.TotalScore)
+						{
+							++rank;
+						}
+					}
+
+					team1.Rank = rank;
+				}
+				else
+				{
+					team1.Rank = 0;
+				}
+			}
+		}
+
+		void UpdateAfterScoreUpdate(ObservableCollection<TeamData> teamList)
+		{
+			UpdateRank(teamList);
+
+			NotifyPropertyChanged("TotalScoreString");
+			NotifyPropertyChanged("DetailedJudgeScoresString");
+		}
+
+		public void SetFinishedScore(ObservableCollection<TeamData> teamList, DialRoutineScoreData newScore)
+		{
+			for (int i = 0; i < Scores.Count; ++i)
+			{
+				DialRoutineScoreData score = Scores[i];
+
+				if (score.IsSameInstance(newScore))
+				{
+					Scores[i] = newScore;
+
+					UpdateAfterScoreUpdate(teamList);
+
+					return;
+				}
+			}
+
+			Scores.Add(newScore);
+
+			UpdateAfterScoreUpdate(teamList);
+		}
 	}
 
 	public class SaveData
 	{
 		public ObservableCollection<TeamData> TeamList = new ObservableCollection<TeamData>();
+		public List<JudgeData> ImportedJudges = new List<JudgeData>();
 		public float RoutineLengthMinutes = 3f;
 	}
 }

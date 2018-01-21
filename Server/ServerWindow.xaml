@@ -10,6 +10,7 @@
         Closed="Window_Closed">
     <Grid Name="TopLevelGrid">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
@@ -17,7 +18,7 @@
 
         <Menu>
             <MenuItem Header="_File">
-                <MenuItem Header="_Save"/>
+                <MenuItem Header="_Save" Click="SaveButton_Click"/>
                 <MenuItem Header="S_ave As"/>
                 <MenuItem Header="E_xit" Click="MenuItemExit_Click"/>
             </MenuItem>
@@ -27,7 +28,7 @@
             </MenuItem>
         </Menu>
 
-        <Grid>
+        <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
@@ -38,10 +39,19 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Label Content="Teams" HorizontalAlignment="Center"/>
-                <TextBox Grid.Row="1" Name="TeamsTextBox" AcceptsReturn="True"/>
+                <Label Content="Teams" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="LightBlue" Margin="1,0,1,0"/>
+                <ScrollViewer Grid.Row="1" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                    <TextBox Name="TeamsTextBox" AcceptsReturn="True"/>
+                </ScrollViewer>
+                <Button Grid.Row="1" Content="Import" Click="ImportTeamsButton_Click" Width="50" Height="25" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+
+                <Label Grid.Row="2" Content="Judges" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="LightBlue"/>
+                <TextBox Grid.Row="3" Name="JudgesTextBox" AcceptsReturn="True"/>
+                <Button Grid.Row="3" Content="Import" Click="ImportJudgesButton_Click"  Width="50" Height="25" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
             </Grid>
 
             <Grid Grid.Column="1">
@@ -50,8 +60,8 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Label Content="Results" HorizontalAlignment="Center"/>
-                <TextBox Grid.Row="1" Name="ResultsTextBox" AcceptsReturn="True"/>
+                <Label Content="Results" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="LightBlue" Margin="1,0,1,0"/>
+                <TextBox Grid.Row="1" Name="ResultsTextBox" Text="{Binding ResultsText}" AcceptsReturn="True" IsReadOnly="True"/>
             </Grid>
 
             <Grid Grid.Column="2">
@@ -60,7 +70,7 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Label Content="Clients" HorizontalAlignment="Center"/>
+                <Label Content="Clients" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="LightBlue" Margin="1,0,1,0"/>
                 <ItemsControl Grid.Row="1" Name="JudgesControl" HorizontalContentAlignment="Stretch">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -70,10 +80,14 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <Label Content="{Binding JudgeName}"/>
+                                        <Label Content="{Binding ClientName}"/>
                                         <Label Grid.Column="1" Content="{Binding JudgeValue}"/>
+                                        <Label Grid.Column="2" Content="{Binding JudgeName}"/>
+                                        <Label Grid.Column="3" Content="{Binding JudgeCategory}"/>
                                     </Grid>
                                 </Border>
                             </Grid>
@@ -83,7 +97,7 @@
             </Grid>
         </Grid>
 
-        <ItemsControl Grid.Row="1" Name="TeamsControl" HorizontalContentAlignment="Stretch">
+        <ItemsControl Grid.Row="2" Name="TeamsControl" HorizontalContentAlignment="Stretch">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <Grid>
@@ -96,15 +110,17 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
                                 <Button Content="Set Playing" Tag="{Binding}" Click="SetPlayingTeam_Click"/>
-                                <Label Grid.Column="1" Content="{Binding TeamNames}"/>
+                                <Label Grid.Column="1" Content="{Binding PlayerNamesString}"/>
                                 <Label Grid.Column="2" Content="Total Points:" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
-                                <Label Grid.Column="3" Content="{Binding ScoreString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                <Label Grid.Column="3" Content="{Binding TotalScoreString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
                                 <Label Grid.Column="4" Content="Rank:" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
                                 <Label Grid.Column="5" Content="{Binding RankString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                <Label Grid.Column="6" Content="{Binding DetailedJudgeScoresString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
                             </Grid>
                         </Border>
                     </Grid>
@@ -112,7 +128,7 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>

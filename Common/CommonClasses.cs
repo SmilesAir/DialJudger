@@ -133,18 +133,134 @@ namespace CommonClasses
 		{
 		}
 	}
-	
+
 	// Use as base class for future scoring systems
-	public class RoutineScoreData
+	[ProtoContract]
+	[ProtoInclude(500, typeof(DialRoutineScoreData))]
+	public abstract class BaseRoutineScoreData
 	{
-		public float TotalScore
+		[ProtoMember(1)]
+		public string JudgeName = "";
+		[ProtoMember(2)]
+		public string PlayerNames = "";
+
+		public abstract float GetTotalScore();
+
+		public abstract string GetScoreString();
+
+		public abstract bool IsSameInstance<T>(T other) where T: BaseRoutineScoreData;
+	}
+
+	public enum ECategory
+	{
+		General,
+		ArtisticImpression,
+		Difficulty,
+		Execution
+	}
+
+	[ProtoContract]
+	public class JudgeData
+	{
+		[ProtoMember(1)]
+		public string JudgeName = "";
+
+		[ProtoMember(2)]
+		public ECategory Category = ECategory.General;
+
+		public JudgeData()
 		{
-			get { return 0f; }
 		}
 
-		public string ScoreString
+		public JudgeData(string judgeName, ECategory categoryName)
 		{
-			get { return TotalScore.ToString("0.0"); }
+			JudgeName = judgeName;
+			Category = categoryName;
+		}
+	}
+
+	[ProtoContract]
+	public class InitRoutineData
+	{
+		[ProtoMember(1)]
+		public string PlayersNames = "";
+
+		[ProtoMember(2)]
+		public float RoutineLengthMinutes = 0f;
+
+		public InitRoutineData()
+		{
+		}
+
+		public InitRoutineData(string playerNames, float routineLengthMinutes)
+		{
+			PlayersNames = playerNames;
+			RoutineLengthMinutes = routineLengthMinutes;
+		}
+	}
+
+	[ProtoContract]
+	public class DialInputData
+	{
+		[ProtoMember(1)]
+		public float DialScore = 0f;
+		[ProtoMember(2)]
+		public float TimeSeconds = 0f;
+
+		public DialInputData()
+		{
+		}
+
+		public DialInputData(float dialScore, float timeSeconds)
+		{
+			DialScore = dialScore;
+			TimeSeconds = timeSeconds;
+		}
+	}
+
+	[ProtoContract]
+	public class DialRoutineScoreData : BaseRoutineScoreData
+	{
+		[ProtoMember(1)]
+		public List<DialInputData> DialInputs = new List<DialInputData>();
+
+		public override float GetTotalScore()
+		{
+			return GetTotalScore(0f);
+		}
+
+		public float GetTotalScore(float additionalSeconds)
+		{
+			float total = 0f;
+
+			for (int i = 0; i < DialInputs.Count - 1; ++i)
+			{
+				DialInputData first = DialInputs[i];
+				DialInputData second = DialInputs[i + 1];
+
+				float timeDelta = second.TimeSeconds - first.TimeSeconds;
+
+				total += timeDelta * first.DialScore;
+			}
+
+			if (additionalSeconds > 0f && DialInputs.Count > 0)
+			{
+				DialInputData last = DialInputs.Last();
+
+				total += additionalSeconds * last.DialScore;
+			}
+
+			return total;
+		}
+
+		public override string GetScoreString()
+		{
+			return GetTotalScore().ToString("0.0");
+		}
+
+		public override bool IsSameInstance<T>(T other)
+		{
+			return other.JudgeName == JudgeName && other.PlayerNames == PlayerNames;
 		}
 	}
 }

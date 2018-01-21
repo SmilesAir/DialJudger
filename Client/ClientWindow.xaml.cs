@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
@@ -24,6 +25,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using System.Xml.Serialization;
 
 namespace Client
 {
@@ -34,6 +36,8 @@ namespace Client
 	{
 		System.Timers.Timer BroadcastTimer = new System.Timers.Timer();
 		System.Timers.Timer SendScoreTimer = new System.Timers.Timer();
+		System.Timers.Timer FinishRoutineTimer = new System.Timers.Timer();
+		System.Timers.Timer UpdateRoutineTimeTimer = new System.Timers.Timer();
 		bool bIsConnected = false;
 		public bool IsConnected
 		{
@@ -61,10 +65,21 @@ namespace Client
 				dialValue = value;
 				NotifyPropertyChanged("DialValue");
 				NotifyPropertyChanged("DisplayDialValue");
+				NotifyPropertyChanged("SliderValue");
+			}
+		}
+		public float SliderValue
+		{
+			get { return dialValue; }
+			set
+			{
+				SetDialValue(value);
+
+				NotifyPropertyChanged("SliderValue");
 			}
 		}
 		private float DialIncrementValue = .1f;
-		private EDialSpeed DialSpeed = EDialSpeed.Slow;
+		private EDialSpeed DialSpeed = EDialSpeed.Medium;
 		private ClientIdData clientId = null;
 		public ClientIdData ClientId
 		{
@@ -79,30 +94,96 @@ namespace Client
 		public string ServerIp = "";
 		public int ServerPort = 0;
 		bool bIsHooked = false;
+		float routineLengthMinutes = 0f;
+		public float RoutineLengthMinutes
+		{
+			get { return routineLengthMinutes; }
+			set
+			{
+				routineLengthMinutes = value;
+				NotifyPropertyChanged("RoutineLengthMinutes");
+				NotifyPropertyChanged("DisplayTimeString");
+			}
+		}
+		public bool IsJudging { get { return FinishRoutineTimer.Enabled; } }
+		DateTime StartRoutineTime;
+		public double SecondsFromRoutineStart { get { return (DateTime.Now - StartRoutineTime).TotalSeconds; } }
+		public string DisplayTimeString
+		{
+			get
+			{
+				int secondsRemaining = (int)(Math.Round(RoutineLengthMinutes * 60));
+				if (IsJudging)
+				{
+					secondsRemaining = (int)(Math.Round(RoutineLengthMinutes * 60 - SecondsFromRoutineStart));
+				}
+
+				return string.Format("Time Remaining: {0:0}:{1:00}", secondsRemaining / 60, secondsRemaining % 60);
+			}
+		}
+		public DialRoutineScoreData RoutineScore = new DialRoutineScoreData();
+		public string TotalScoreString
+		{
+			get
+			{
+				float additionalSeconds = 0f;
+				if (IsJudging && RoutineScore.DialInputs.Count > 0)
+				{
+					additionalSeconds = (float)(SecondsFromRoutineStart - RoutineScore.DialInputs.Last().TimeSeconds);
+				}
+				return "Total Score: " + RoutineScore.GetTotalScore(additionalSeconds).ToString("0.0");
+			}
+		}
 
 		static MainWindow ClientWindow;
 
 		#region Display
 		public string DisplayWindowTitle { get { return "Dial Judge Client - " + (ClientId == null ? "None" : ClientId.DisplayName); } }
-		private string displayJudgeName = "No Judge Name";
-		public string DisplayJudgeName
+		private string judgeName = "No Judge Name";
+		public string JudgeName
 		{
-			get { return "Judge: " + displayJudgeName; }
+			get { return judgeName; }
 			set
 			{
-				displayJudgeName = value;
+				judgeName = value;
+				NotifyPropertyChanged("JudgeName");
 				NotifyPropertyChanged("DisplayJudgeName");
 			}
 		}
-		private string displayTeamName = "No Team";
-		public string DisplayTeamName
+		public string DisplayJudgeName
 		{
-			get { return "Team: " + displayTeamName; }
+			get { return "Judge: " + JudgeName; }
+		}
+		private string teamName = "No Team";
+		public string TeamName
+		{
+			get { return teamName; }
 			set
 			{
-				displayTeamName = value;
+				teamName = value;
+				NotifyPropertyChanged("TeamName");
 				NotifyPropertyChanged("DisplayTeamName");
 			}
+		}
+		public string DisplayTeamName
+		{
+			get { return "Team: " + TeamName; }
+		}
+
+		private ECategory judgeCategory = ECategory.General;
+		public ECategory JudgeCategory
+		{
+			get { return judgeCategory; }
+			set
+			{
+				judgeCategory = value;
+				NotifyPropertyChanged("JudgeCategory");
+				NotifyPropertyChanged("DisplayCategoryName");
+			}
+		}
+		public string DisplayCategoryName
+		{
+			get { return "Category: " + JudgeCategory.ToString(); }
 		}
 		public string DisplayDialValue { get { return DialValue.ToString("0.0"); } }
 		public bool DisplayDialSpeedSlowChecked
@@ -191,6 +272,8 @@ namespace Client
 
 			this.DataContext = this;
 
+			SetDialSpeed(DialSpeed);
+
 			ClientWindow.ClientId = new ClientIdData(Environment.MachineName, CommonDebug.GetOptionalNumberId());
 		}
 
@@ -199,14 +282,30 @@ namespace Client
 			BroadcastTimer.Interval = 1000;
 			BroadcastTimer.AutoReset = true;
 			BroadcastTimer.Elapsed += BroadcastTimer_Elapsed;
-
 			BroadcastTimer.Start();
 
 			SendScoreTimer.Interval = 500;
 			SendScoreTimer.AutoReset = true;
 			SendScoreTimer.Elapsed += SendScoreTimer_Elapsed;
-
 			SendScoreTimer.Start();
+
+			UpdateRoutineTimeTimer.AutoReset = true;
+			UpdateRoutineTimeTimer.Interval = 1000;
+			UpdateRoutineTimeTimer.Elapsed += UpdateRoutineTimeTimer_Elapsed;
+
+			FinishRoutineTimer.AutoReset = false;
+			FinishRoutineTimer.Elapsed += FinishRoutineTimer_Elapsed;
+		}
+
+		private void FinishRoutineTimer_Elapsed(object sender, ElapsedEventArgs e)
+		{
+			FinishRoutine();
+		}
+
+		private void UpdateRoutineTimeTimer_Elapsed(object sender, ElapsedEventArgs e)
+		{
+			NotifyPropertyChanged("DisplayTimeString");
+			NotifyPropertyChanged("TotalScoreString");
 		}
 
 		private void SendScoreTimer_Elapsed(object sender, ElapsedEventArgs e)
@@ -269,7 +368,9 @@ namespace Client
 			NetworkComms.AppendGlobalConnectionCloseHandler(OnConnectionClosed);
 
 			NetworkComms.AppendGlobalIncomingPacketHandler<string>("BroadcastServerInfo", HandleBroadcastServerInfo);
-			NetworkComms.AppendGlobalIncomingPacketHandler<string>("ServerStartRoutine", HandleStartRoutine);
+			NetworkComms.AppendGlobalIncomingPacketHandler<InitRoutineData>("ServerStartRoutine", HandleStartRoutine);
+			NetworkComms.AppendGlobalIncomingPacketHandler<InitRoutineData>("ServerSetPlayingTeam", HandleSetPlayingTeam);
+			NetworkComms.AppendGlobalIncomingPacketHandler<JudgeData>("ServerSetJudgeInfo", HandleSetJudgeInfo);
 		}
 
 		private static void HandleBroadcastServerInfo(PacketHeader header, Connection connection, string serverInfo)
@@ -280,14 +381,30 @@ namespace Client
 			NetworkComms.SendObject("ClientConnect", ClientWindow.ServerIp, ClientWindow.ServerPort, ClientWindow.ClientId);
 		}
 
-		private static void HandleStartRoutine(PacketHeader header, Connection connection, string startParams)
+		private static void HandleStartRoutine(PacketHeader header, Connection connection, InitRoutineData startData)
 		{
-			ClientWindow.SetDialSpeed(EDialSpeed.Fast);
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			{
+				ClientWindow.TeamName = startData.PlayersNames;
+				ClientWindow.RoutineLengthMinutes = startData.RoutineLengthMinutes;
+
+				ClientWindow.StartRoutine();
+			}));
 		}
 
-		private static void HandleSetTeam(PacketHeader header, Connection connection, string startParams)
+		private static void HandleSetPlayingTeam(PacketHeader header, Connection connection, InitRoutineData startData)
 		{
-			ClientWindow.SetDialSpeed(EDialSpeed.Fast);
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			{
+				ClientWindow.TeamName = startData.PlayersNames;
+				ClientWindow.RoutineLengthMinutes = startData.RoutineLengthMinutes;
+			}));
+		}
+
+		private static void HandleSetJudgeInfo(PacketHeader header, Connection connection, JudgeData judgeData)
+		{
+			ClientWindow.JudgeName = judgeData.JudgeName;
+			ClientWindow.JudgeCategory = judgeData.Category;
 		}
 
 		private void BroadcastFindServer()
@@ -308,17 +425,124 @@ namespace Client
 
 		private void OnDialInput(EDialInput input)
 		{
+			float newValue = DialValue;
 			switch (input)
 			{
 				case EDialInput.Up:
-					DialValue += DialIncrementValue;
+					newValue += DialIncrementValue;
 					break;
 				case EDialInput.Down:
-					DialValue -= DialIncrementValue;
+					newValue -= DialIncrementValue;
 					break;
 			}
 
-			DialValue = Math.Max(0f, Math.Min(10f, DialValue));
+			SetDialValue(newValue);
+		}
+
+		private void SetDialValue(float newValue)
+		{
+			DialValue = Math.Max(0f, Math.Min(10f, newValue));
+
+			if (IsJudging)
+			{
+				RoutineScore.DialInputs.Add(new DialInputData(DialValue, (float)SecondsFromRoutineStart));
+			}
+		}
+
+		private void StartRoutine()
+		{
+			DialValue = 0f;
+			StartRoutineTime = DateTime.Now;
+			RoutineScore.DialInputs.Clear();
+			RoutineScore.JudgeName = JudgeName;
+			RoutineScore.PlayerNames = TeamName;
+
+			FinishRoutineTimer.Interval = routineLengthMinutes * 60 * 1000;
+			FinishRoutineTimer.Start();
+
+			UpdateRoutineTimeTimer.Start();
+		}
+
+		private void FinishRoutine()
+		{
+			UpdateRoutineTimeTimer.Stop();
+
+			RoutineScore.DialInputs.Add(new DialInputData(DialValue, (float)SecondsFromRoutineStart));
+
+			CreateBackup();
+
+			NotifyPropertyChanged("TotalScoreString");
+			NotifyPropertyChanged("DisplayTimeString");
+
+			DialValue = 0f;
+
+			// send results
+			NetworkComms.SendObject("JudgeFinishedScore", ClientWindow.ServerIp, ClientWindow.ServerPort, RoutineScore);
+		}
+
+		private void CancelRoutine()
+		{
+		}
+
+		public void CreateBackup()
+		{
+			try
+			{
+				if (!Directory.Exists("DialJudgerClientBackups"))
+				{
+					Directory.CreateDirectory("DialJudgerClientBackups");
+				}
+
+				string filename = "DialJudgerClientBackups\\" + RoutineScore.JudgeName + "-" + RoutineScore.PlayerNames + "-" +
+					DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss") + ".txt";
+
+				XmlSerializer serializer = new XmlSerializer(typeof(DialRoutineScoreData));
+				using (StringWriter retString = new StringWriter())
+				{
+					serializer.Serialize(retString, RoutineScore);
+					using (StreamWriter saveFile = new StreamWriter(filename))
+					{
+						saveFile.Write(retString.ToString());
+					}
+				}
+			}
+			catch
+			{
+			}
+		}
+
+		public void SendBackupToServer()
+		{
+			try
+			{
+				Microsoft.Win32.OpenFileDialog ofd = new Microsoft.Win32.OpenFileDialog();
+				ofd.DefaultExt = ".txt";
+				ofd.Filter = "Text Files (*.txt)|*.txt";
+				ofd.Multiselect = true;
+
+				if (ofd.ShowDialog() == true)
+				{
+					foreach (string filename in ofd.FileNames)
+					{
+						using (StreamReader saveFile = new StreamReader(filename))
+						{
+							XmlSerializer serializer = new XmlSerializer(typeof(DialRoutineScoreData));
+							DialRoutineScoreData backupScore = (DialRoutineScoreData)serializer.Deserialize(saveFile);
+
+							NetworkComms.SendObject("JudgeSendBackupScore", ClientWindow.ServerIp, ClientWindow.ServerPort, backupScore);
+						}
+					}
+				}
+			}
+			catch
+			{
+				// Popup Error
+			}
+		}
+
+		private void SendBackupButton_Click(object sender, RoutedEventArgs e)
+		{
+			SendBackupToServer();
 		}
 
 		#region KeyboardHooks
@@ -351,7 +575,7 @@ namespace Client
 		}
 
 		private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
-		
+
 		private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
 		{
 			if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN)
@@ -364,7 +588,7 @@ namespace Client
 					{
 						ClientWindow.OnDialInput(EDialInput.Up);
 					}));
-					
+
 					return (IntPtr)1;
 				}
 				else if (vkCode == 174)
