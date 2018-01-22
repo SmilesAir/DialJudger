@@ -214,6 +214,11 @@ namespace Server
 			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
 			{
 				Clients.Add(connection, clientInfo, () => ServerWindow.UpdateJudgesForClients());
+
+				if (clientInfo.ClientType == EClientType.Scoreboard)
+				{
+					ServerWindow.SendUpdatesToScoreboard();
+				}
 			}));
 		}
 
@@ -262,8 +267,67 @@ namespace Server
 
 				UpdateResultsText();
 
+				SendUpdatesToScoreboard();
+
 				Save();
 			}
+		}
+
+		void SendResultsToScoreboard()
+		{
+			List<TeamData> sortedTeams = CalcSortedTeams();
+			ScoreboardResultsData results = new ScoreboardResultsData();
+
+			foreach (TeamData team in sortedTeams)
+			{
+				ScoreboardTeamResultData teamResult = new ScoreboardTeamResultData();
+
+				teamResult.PlayerNames = team.PlayerNamesString;
+				teamResult.Rank = team.Rank;
+				teamResult.TotalPoints = team.TotalScore;
+
+				results.Results.Add(teamResult);
+			}
+
+			foreach (ClientData cd in Clients.Clients)
+			{
+				if (cd.ClientId.ClientType == EClientType.Scoreboard)
+				{
+					cd.ConnectionData.SendObject("ServerSendResults", results);
+				}
+			}
+		}
+
+		void SendUpNextTeamsToScoreboard()
+		{
+			List<TeamData> upNextTeams = new List<TeamData>();
+			foreach (TeamData team in SaveDataInst.TeamList)
+			{
+				if (team.Rank == 0)
+				{
+					upNextTeams.Add(team);
+				}
+			}
+
+			ScoreboardUpNextData upNextData = new ScoreboardUpNextData();
+			foreach (TeamData team in upNextTeams)
+			{
+				upNextData.UpNextTeams.Add(new ScoreboardUpNextTeamData(team.PlayerNamesString));
+			}
+
+			foreach (ClientData cd in Clients.Clients)
+			{
+				if (cd.ClientId.ClientType == EClientType.Scoreboard)
+				{
+					cd.ConnectionData.SendObject("ServerSendUpNextTeams", upNextData);
+				}
+			}
+		}
+
+		void SendUpdatesToScoreboard()
+		{
+			SendResultsToScoreboard();
+			SendUpNextTeamsToScoreboard();
 		}
 
 		private static void OnConnectionEstablished(Connection connection)
@@ -380,18 +444,23 @@ namespace Server
 			//newJudges.Add(new JudgeData("Randy Silvey", ECategory.General));
 			//newJudges.Add(new JudgeData("Bob Boulware", ECategory.General));
 
-			for (int i = 0; i < SaveDataInst.ImportedJudges.Count && i < Clients.Clients.Count; ++i)
+			for (int judgeIndex = 0, clientIndex = 0; judgeIndex < SaveDataInst.ImportedJudges.Count && clientIndex < Clients.Clients.Count; ++clientIndex)
 			{
-				JudgeData jd = SaveDataInst.ImportedJudges[i];
-				ClientData cd = Clients.Clients[i];
+				JudgeData jd = SaveDataInst.ImportedJudges[judgeIndex];
+				ClientData cd = Clients.Clients[clientIndex];
 
-				cd.Judge = jd;
+				if (cd.ClientId.ClientType == EClientType.Judge)
+				{
+					cd.Judge = jd;
 
-				cd.ConnectionData.SendObject("ServerSetJudgeInfo", jd);
+					cd.ConnectionData.SendObject("ServerSetJudgeInfo", jd);
+
+					++judgeIndex;
+				}
 			}
 		}
 
-		void UpdateResultsText()
+		List<TeamData> CalcSortedTeams()
 		{
 			List<TeamData> sortedTeams = new List<TeamData>();
 			foreach (TeamData team in SaveDataInst.TeamList)
@@ -404,17 +473,26 @@ namespace Server
 					}
 					else
 					{
-						for (int i = 0; i < sortedTeams.Count; ++i)
+						int insertIndex = 0;
+						for (; insertIndex < sortedTeams.Count; ++insertIndex)
 						{
-							if (sortedTeams[i].Rank > 0 && team.Rank < sortedTeams[i].Rank)
+							if (sortedTeams[insertIndex].Rank > 0 && team.Rank < sortedTeams[insertIndex].Rank)
 							{
-								sortedTeams.Insert(i, team);
 								break;
 							}
 						}
+
+						sortedTeams.Insert(insertIndex, team);
 					}
 				}
 			}
+
+			return sortedTeams;
+		}
+
+		void UpdateResultsText()
+		{
+			List<TeamData> sortedTeams = CalcSortedTeams();
 
 			ResultsText = "";
 
@@ -471,6 +549,8 @@ namespace Server
 			}
 
 			Save();
+			SendUpdatesToScoreboard();
+			UpdateResultsText();
 		}
 
 		private void ImportTeamsButton_Click(object sender, RoutedEventArgs e)
@@ -563,6 +643,7 @@ namespace Server
 						}
 
 						UpdateJudgesForClients();
+						UpdateResultsText();
 					}
 				}
 			}
@@ -616,6 +697,10 @@ namespace Server
 				NotifyPropertyChanged("LastJudgeValue");
 				NotifyPropertyChanged("JudgeValue");
 			}
+		}
+		public string ClientTypeString
+		{
+			get { return ClientId.ClientType.ToString(); }
 		}
 
 		// Display

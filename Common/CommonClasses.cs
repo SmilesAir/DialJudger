@@ -4,6 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using ProtoBuf;
+using NetworkCommsDotNet.Connections;
+using System.Net;
+using System.Timers;
+using NetworkCommsDotNet.Connections.UDP;
+using NetworkCommsDotNet;
 
 namespace CommonClasses
 {
@@ -37,14 +42,23 @@ namespace CommonClasses
 		public static int InvalidNumberId = -1;
 	}
 
+	public enum EClientType
+	{
+		Judge,
+		Scoreboard,
+		Overlay
+	}
+
 	[ProtoContract]
 	public class ClientIdData
 	{
 		[ProtoMember(1)]
 		public string Name = "";
-
 		[ProtoMember(2)]
 		public int OptionalNumberId = CommonValues.InvalidNumberId;
+		[ProtoMember(3)]
+		public EClientType ClientType = EClientType.Judge;
+
 
 		public string DisplayName { get { return Name + (OptionalNumberId == CommonValues.InvalidNumberId ? "" : " (" + OptionalNumberId + ")"); } }
 
@@ -52,15 +66,17 @@ namespace CommonClasses
 		{
 		}
 
-		public ClientIdData(string name)
+		public ClientIdData(string name, EClientType type)
 		{
 			Name = name;
+			ClientType = type;
 		}
 
-		public ClientIdData(string name, int numberId)
+		public ClientIdData(string name, int numberId, EClientType type)
 		{
 			Name = name;
 			OptionalNumberId = numberId;
+			ClientType = type;
 		}
 
 		public bool CompareTo(ClientIdData id)
@@ -264,6 +280,47 @@ namespace CommonClasses
 		}
 	}
 
+	[ProtoContract]
+	public class ScoreboardTeamResultData
+	{
+		[ProtoMember(1)]
+		public int Rank = 0;
+		[ProtoMember(2)]
+		public string PlayerNames = "";
+		[ProtoMember(3)]
+		public float TotalPoints = 0f;
+	}
+
+	[ProtoContract]
+	public class ScoreboardResultsData
+	{
+		[ProtoMember(1)]
+		public List<ScoreboardTeamResultData> Results = new List<ScoreboardTeamResultData>();
+	}
+
+	[ProtoContract]
+	public class ScoreboardUpNextTeamData
+	{
+		[ProtoMember(1)]
+		public string PlayerNames = "";
+
+		public ScoreboardUpNextTeamData()
+		{
+		}
+
+		public ScoreboardUpNextTeamData(string playerNames)
+		{
+			PlayerNames = playerNames;
+		}
+	}
+
+	[ProtoContract]
+	public class ScoreboardUpNextData
+	{
+		[ProtoMember(1)]
+		public List<ScoreboardUpNextTeamData> UpNextTeams = new List<ScoreboardUpNextTeamData>();
+	}
+	
 	public class RoutineTimers
 	{
 		System.Timers.Timer FinishRoutineTimer = new System.Timers.Timer();
@@ -345,6 +402,97 @@ namespace CommonClasses
 			UpdateRoutineTimeTimer.Stop();
 
 			UpdateCallback();
+		}
+	}
+
+	public class ClientConnection
+	{
+		System.Timers.Timer BroadcastTimer = new System.Timers.Timer();
+
+		bool bIsConnected = false;
+		public bool IsConnected
+		{
+			get { return bIsConnected; }
+			set
+			{
+				bIsConnected = value;
+
+				if (bIsConnected)
+				{
+					BroadcastTimer.Stop();
+				}
+				else
+				{
+					BroadcastTimer.Start();
+				}
+			}
+		}
+		public string ServerIp = "";
+		public int ServerPort = 0;
+		private ClientIdData clientId = null;
+		public ClientIdData ClientId
+		{
+			get { return clientId; }
+			set
+			{
+				clientId = value;
+
+				OnClientIdChanged(value);
+			}
+		}
+		Action<ClientIdData> OnClientIdChanged;
+
+		public ClientConnection(Action<ClientIdData> onClientIdChanged)
+		{
+			OnClientIdChanged = onClientIdChanged;
+		}
+
+		public void StartConnection(EClientType type)
+		{
+			ClientId = new ClientIdData(Environment.MachineName, CommonDebug.GetOptionalNumberId(), type);
+
+			BroadcastTimer.Interval = 1000;
+			BroadcastTimer.AutoReset = true;
+			BroadcastTimer.Elapsed += BroadcastTimer_Elapsed;
+			BroadcastTimer.Start();
+
+			NetworkComms.AppendGlobalConnectionEstablishHandler(conn => OnConnectionEstablished(conn));
+			NetworkComms.AppendGlobalConnectionCloseHandler(conn => OnConnectionClosed(conn));
+			NetworkComms.AppendGlobalIncomingPacketHandler<string>("BroadcastServerInfo",
+				(header, connection, serverInfo) => HandleBroadcastServerInfo(header, connection, serverInfo));
+
+			Connection.StartListening(ConnectionType.UDP, new IPEndPoint(IPAddress.Any, 0), true);
+		}
+
+		private void BroadcastTimer_Elapsed(object sender, ElapsedEventArgs e)
+		{
+			BroadcastFindServer();
+		}
+
+		private void BroadcastFindServer()
+		{
+			IPEndPoint ipEndPoint = Connection.ExistingLocalListenEndPoints(ConnectionType.UDP)[0] as IPEndPoint;
+			UDPConnection.SendObject("BroadcastFindServer", ipEndPoint.Port, new IPEndPoint(IPAddress.Broadcast, 10000));
+		}
+
+		private void OnConnectionEstablished(Connection connection)
+		{
+			IsConnected = true;
+
+			Connection.StopListening();
+		}
+
+		private void HandleBroadcastServerInfo(PacketHeader header, Connection connection, string serverInfo)
+		{
+			ServerIp = serverInfo.Split(':').First();
+			ServerPort = int.Parse(serverInfo.Split(':').Last());
+
+			NetworkComms.SendObject("ClientConnect", ServerIp, ServerPort, ClientId);
+		}
+
+		private void OnConnectionClosed(Connection connection)
+		{
+			IsConnected = false;
 		}
 	}
 }

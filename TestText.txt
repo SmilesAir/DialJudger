@@ -2,6 +2,13 @@ Teams
 Ryan Young, James Wiseman
 Jake Gauthier, Matt Gauthier
 Emma Kahle, Cindy St. Mary
+Jakub Kostel, Freddy Finner
+Silvina Porche, Anna Merlo
+Balu Major, Fabio Sanna
+Paul Kenney, Daniel O'Neil
+John Titcomb, Steven Hays
+Mike Galloupe, Johnny Trevino
+Char Powell, Juliana Korver
 
 Judges
 Bob Boulware, General
@@ -9,3 +16,6 @@ Randy Silvey, Difficulty
 
 
 Background text for Teams and Judges import instruction
+Add scratch button that puts in all 0 scores
+Add score splits
+Time call reminder

@@ -13,7 +13,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height=".7*"/>
         </Grid.RowDefinitions>
 
         <Menu>
@@ -50,7 +50,9 @@
                 <Button Grid.Row="1" Content="Import" Click="ImportTeamsButton_Click" Width="50" Height="25" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
 
                 <Label Grid.Row="2" Content="Judges" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="LightBlue"/>
-                <TextBox Grid.Row="3" Name="JudgesTextBox" AcceptsReturn="True"/>
+                <ScrollViewer Grid.Row="3" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                    <TextBox Name="JudgesTextBox" AcceptsReturn="True"/>
+                </ScrollViewer>
                 <Button Grid.Row="3" Content="Import" Click="ImportJudgesButton_Click"  Width="50" Height="25" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
             </Grid>
 
@@ -61,7 +63,9 @@
                 </Grid.RowDefinitions>
 
                 <Label Content="Results" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="LightBlue" Margin="1,0,1,0"/>
-                <TextBox Grid.Row="1" Name="ResultsTextBox" Text="{Binding ResultsText}" AcceptsReturn="True" IsReadOnly="True"/>
+                <ScrollViewer Grid.Row="1" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                    <TextBox Name="ResultsTextBox" Text="{Binding ResultsText}" AcceptsReturn="True" IsReadOnly="True"/>
+                </ScrollViewer>
             </Grid>
 
             <Grid Grid.Column="2">
@@ -78,16 +82,18 @@
                                 <Border>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="30"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
 
                                         <Label Content="{Binding ClientName}"/>
                                         <Label Grid.Column="1" Content="{Binding JudgeValue}"/>
                                         <Label Grid.Column="2" Content="{Binding JudgeName}"/>
                                         <Label Grid.Column="3" Content="{Binding JudgeCategory}"/>
+                                        <Label Grid.Column="4" Content="{Binding ClientTypeString}"/>
                                     </Grid>
                                 </Border>
                             </Grid>
@@ -97,36 +103,38 @@
             </Grid>
         </Grid>
 
-        <ItemsControl Grid.Row="2" Name="TeamsControl" HorizontalContentAlignment="Stretch">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <Grid>
-                        <Border>
-                            <Grid Background="{Binding DisplayBackgroundColor}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+        <ScrollViewer Grid.Row="2" ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ItemsControl Name="TeamsControl" HorizontalContentAlignment="Stretch">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Border>
+                                <Grid Background="{Binding DisplayBackgroundColor}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                <Button Content="Set Playing" Tag="{Binding}" Click="SetPlayingTeam_Click"/>
-                                <Label Grid.Column="1" Content="{Binding PlayerNamesString}"/>
-                                <Label Grid.Column="2" Content="Total Points:" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
-                                <Label Grid.Column="3" Content="{Binding TotalScoreString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
-                                <Label Grid.Column="4" Content="Rank:" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
-                                <Label Grid.Column="5" Content="{Binding RankString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
-                                <Label Grid.Column="6" Content="{Binding DetailedJudgeScoresString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
-                            </Grid>
-                        </Border>
-                    </Grid>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+                                    <Button Content="Set Playing" Tag="{Binding}" Click="SetPlayingTeam_Click"/>
+                                    <Label Grid.Column="1" Content="{Binding PlayerNamesString}"/>
+                                    <Label Grid.Column="2" Content="Total Points:" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                    <Label Grid.Column="3" Content="{Binding TotalScoreString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                    <Label Grid.Column="4" Content="Rank:" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                    <Label Grid.Column="5" Content="{Binding RankString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                    <Label Grid.Column="6" Content="{Binding DetailedJudgeScoresString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
 
         <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>

@@ -26,6 +26,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.Xml.Serialization;
+using System.Speech.Synthesis;
 
 namespace Client
 {
@@ -34,26 +35,12 @@ namespace Client
 	/// </summary>
 	public partial class MainWindow : Window, INotifyPropertyChanged
 	{
-		System.Timers.Timer BroadcastTimer = new System.Timers.Timer();
+		ClientConnection ClientCon = null;
 		System.Timers.Timer SendScoreTimer = new System.Timers.Timer();
 		RoutineTimers RoutineTimer = new RoutineTimers(() => ClientWindow.FinishRoutine(), () => ClientWindow.OnUpdateRoutine());
-		bool bIsConnected = false;
 		public bool IsConnected
 		{
-			get { return bIsConnected; }
-			set
-			{
-				bIsConnected = value;
-
-				if (bIsConnected)
-				{
-					BroadcastTimer.Stop();
-				}
-				else
-				{
-					BroadcastTimer.Start();
-				}
-			}
+			get { return ClientCon.IsConnected; }
 		}
 		private float dialValue = 0f;
 		public float DialValue
@@ -79,19 +66,17 @@ namespace Client
 		}
 		private float DialIncrementValue = .1f;
 		private EDialSpeed DialSpeed = EDialSpeed.Medium;
-		private ClientIdData clientId = null;
 		public ClientIdData ClientId
 		{
-			get { return clientId; }
+			get { return ClientCon.ClientId; }
 			set
 			{
-				clientId = value;
+				ClientCon.ClientId = value;
+
 				NotifyPropertyChanged("ClientId");
 				NotifyPropertyChanged("DisplayWindowTitle");
 			}
 		}
-		public string ServerIp = "";
-		public int ServerPort = 0;
 		bool bIsHooked = false;
 		float routineLengthMinutes = 0f;
 		public float RoutineLengthMinutes
@@ -125,6 +110,39 @@ namespace Client
 					additionalSeconds = (float)(RoutineTimer.ElapsedSeconds - RoutineScore.DialInputs.Last().TimeSeconds);
 				}
 				return "Total Score: " + RoutineScore.GetTotalScore(additionalSeconds).ToString("0.0");
+			}
+		}
+		SpeechSynthesizer Speech = new SpeechSynthesizer();
+		int volumeValue = 50;
+		public int VolumeValue
+		{
+			get { return volumeValue; }
+			set
+			{
+				volumeValue = value;
+				Speech.Volume = value;
+
+				NotifyPropertyChanged("VolumeValue");
+			}
+		}
+		bool isSoundMuted = false;
+		public bool IsSoundMuted
+		{
+			get { return isSoundMuted; }
+			set
+			{
+				isSoundMuted = value;
+
+				if (value)
+				{
+					Speech.Volume = 0;
+				}
+				else
+				{
+					Speech.Volume = VolumeValue;
+				}
+
+				NotifyPropertyChanged("IsSoundMuted");
 			}
 		}
 
@@ -261,22 +279,20 @@ namespace Client
 		{
 			InitializeComponent();
 
+			ClientCon = new ClientConnection(newClientId => OnClientIdChanged(newClientId));
+
 			ClientWindow = this;
 
 			this.DataContext = this;
 
 			SetDialSpeed(DialSpeed);
 
-			ClientWindow.ClientId = new ClientIdData(Environment.MachineName, CommonDebug.GetOptionalNumberId());
+			Speech.SetOutputToDefaultAudioDevice();
+			Speech.Volume = VolumeValue;
 		}
 
 		private void InitTimers()
 		{
-			BroadcastTimer.Interval = 1000;
-			BroadcastTimer.AutoReset = true;
-			BroadcastTimer.Elapsed += BroadcastTimer_Elapsed;
-			BroadcastTimer.Start();
-
 			SendScoreTimer.Interval = 500;
 			SendScoreTimer.AutoReset = true;
 			SendScoreTimer.Elapsed += SendScoreTimer_Elapsed;
@@ -289,18 +305,25 @@ namespace Client
 			NotifyPropertyChanged("TotalScoreString");
 		}
 
+		public void PlayNumberSound(float number)
+		{
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			{
+				if (!IsSoundMuted)
+				{
+					Speech.SpeakAsyncCancelAll();
+					Speech.SpeakAsync(decimal.Parse(number.ToString("0.0")).ToString("G29"));
+				}
+			}));
+		}
+
 		private void SendScoreTimer_Elapsed(object sender, ElapsedEventArgs e)
 		{
 			if (IsConnected)
 			{
-				NetworkComms.SendObject("JudgeScoreUpdate", ClientWindow.ServerIp, ClientWindow.ServerPort,
+				NetworkComms.SendObject("JudgeScoreUpdate", ClientCon.ServerIp, ClientCon.ServerPort,
 					new ScoreUpdateData(ClientId, DialValue));
 			}
-		}
-
-		private void BroadcastTimer_Elapsed(object sender, ElapsedEventArgs e)
-		{
-			BroadcastFindServer();
 		}
 
 		#region Window Events
@@ -310,13 +333,17 @@ namespace Client
 			track.Thumb.Width = 80f;
 			track.Thumb.Height = 80f;
 
+			track = (Track)VolumeSlider.Template.FindName("PART_Track", VolumeSlider);
+			track.Thumb.Width = 80f;
+			track.Thumb.Height = 80f;
+
 			AppendHandlers();
 
 			InitTimers();
 
 			SetHook();
 
-			Connection.StartListening(ConnectionType.UDP, new IPEndPoint(IPAddress.Any, 0), true);
+			ClientCon.StartConnection(EClientType.Judge);
 		}
 
 		private void Window_Closed(object sender, EventArgs e)
@@ -345,22 +372,10 @@ namespace Client
 
 		private void AppendHandlers()
 		{
-			NetworkComms.AppendGlobalConnectionEstablishHandler(OnConnectionEstablished);
-			NetworkComms.AppendGlobalConnectionCloseHandler(OnConnectionClosed);
-
-			NetworkComms.AppendGlobalIncomingPacketHandler<string>("BroadcastServerInfo", HandleBroadcastServerInfo);
 			NetworkComms.AppendGlobalIncomingPacketHandler<InitRoutineData>("ServerStartRoutine", HandleStartRoutine);
 			NetworkComms.AppendGlobalIncomingPacketHandler<InitRoutineData>("ServerSetPlayingTeam", HandleSetPlayingTeam);
 			NetworkComms.AppendGlobalIncomingPacketHandler<JudgeData>("ServerSetJudgeInfo", HandleSetJudgeInfo);
 			NetworkComms.AppendGlobalIncomingPacketHandler<string>("ServerCancelRoutine", HandleCancelRoutine);
-		}
-
-		private static void HandleBroadcastServerInfo(PacketHeader header, Connection connection, string serverInfo)
-		{
-			ClientWindow.ServerIp = serverInfo.Split(':').First();
-			ClientWindow.ServerPort = int.Parse(serverInfo.Split(':').Last());
-
-			NetworkComms.SendObject("ClientConnect", ClientWindow.ServerIp, ClientWindow.ServerPort, ClientWindow.ClientId);
 		}
 
 		private static void HandleStartRoutine(PacketHeader header, Connection connection, InitRoutineData startData)
@@ -400,22 +415,6 @@ namespace Client
 			}));
 		}
 
-		private void BroadcastFindServer()
-		{
-			IPEndPoint ipEndPoint = Connection.ExistingLocalListenEndPoints(ConnectionType.UDP)[0] as IPEndPoint;
-			UDPConnection.SendObject("BroadcastFindServer", ipEndPoint.Port, new IPEndPoint(IPAddress.Broadcast, 10000));
-		}
-
-		private static void OnConnectionEstablished(Connection connection)
-		{
-			ClientWindow.IsConnected = true;
-		}
-
-		private static void OnConnectionClosed(Connection connection)
-		{
-			ClientWindow.IsConnected = false;
-		}
-
 		private void OnDialInput(EDialInput input)
 		{
 			float newValue = DialValue;
@@ -435,6 +434,8 @@ namespace Client
 		private void SetDialValue(float newValue)
 		{
 			DialValue = Math.Max(0f, Math.Min(10f, newValue));
+
+			PlayNumberSound(DialValue);
 
 			if (IsJudging)
 			{
@@ -464,7 +465,7 @@ namespace Client
 			DialValue = 0f;
 
 			// send results
-			NetworkComms.SendObject("JudgeFinishedScore", ClientWindow.ServerIp, ClientWindow.ServerPort, RoutineScore);
+			NetworkComms.SendObject("JudgeFinishedScore", ClientCon.ServerIp, ClientCon.ServerPort, RoutineScore);
 		}
 
 		private void CancelRoutine()
@@ -520,7 +521,7 @@ namespace Client
 							XmlSerializer serializer = new XmlSerializer(typeof(DialRoutineScoreData));
 							DialRoutineScoreData backupScore = (DialRoutineScoreData)serializer.Deserialize(saveFile);
 
-							NetworkComms.SendObject("JudgeSendBackupScore", ClientWindow.ServerIp, ClientWindow.ServerPort, backupScore);
+							NetworkComms.SendObject("JudgeSendBackupScore", ClientCon.ServerIp, ClientCon.ServerPort, backupScore);
 						}
 					}
 				}
@@ -534,6 +535,12 @@ namespace Client
 		private void SendBackupButton_Click(object sender, RoutedEventArgs e)
 		{
 			SendBackupToServer();
+		}
+
+		void OnClientIdChanged(ClientIdData newClientId)
+		{
+			NotifyPropertyChanged("ClientId");
+			NotifyPropertyChanged("DisplayWindowTitle");
 		}
 
 		#region KeyboardHooks

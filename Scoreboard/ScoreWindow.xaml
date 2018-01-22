@@ -5,8 +5,129 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Scoreboard"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525">
-    <Grid>
-        
-    </Grid>
+        Title="MainWindow"
+        Height="720" Width="1280"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="CanResizeWithGrip"
+        Loaded="Window_Loaded"
+        MouseDoubleClick="Window_MouseDoubleClick"
+        SizeChanged="Window_SizeChanged">
+
+    <Border BorderBrush="Gray" BorderThickness="1">
+        <Grid Name="TopLevelGrid" Background="AntiqueWhite">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="2*"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Viewbox>
+                <Label Content="{Binding TournamentTitle}"/>
+            </Viewbox>
+
+            <Border Grid.Row="1" Background="LightGray">
+                <Viewbox>
+                    <Label Content="Now Playing"/>
+                </Viewbox>
+            </Border>
+
+            <Grid Grid.Row="2" Height="{Binding TeamDisplayHeight}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Viewbox HorizontalAlignment="Left">
+                    <Label Content="{Binding CurrentPlayingPlayerNames}"/>
+                </Viewbox>
+                <Viewbox Grid.Column="2" HorizontalAlignment="Left">
+                    <Label Content="{Binding SplitPointsString}"/>
+                </Viewbox>
+                <Viewbox Grid.Column="3" HorizontalAlignment="Left">
+                    <Label Content="{Binding SplitDeltaPointsString}"/>
+                </Viewbox>
+            </Grid>
+
+            <Border Grid.Row="3" Background="LightGray">
+                <Viewbox>
+                    <Label Content="Results"/>
+                </Viewbox>
+            </Border>
+
+            <ItemsControl Grid.Row="4" Name="ResultsControl" Tag="{Binding .}" HorizontalContentAlignment="Stretch">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Border>
+                                <Grid Height="{Binding Tag.TeamDisplayHeight, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="3*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="{Binding Tag.PointsDeltaWidth, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Viewbox>
+                                        <Label Content="{Binding RankString}"/>
+                                    </Viewbox>
+                                    <Viewbox Grid.Column="1" HorizontalAlignment="Left">
+                                        <Label Content="{Binding PlayerNames}"/>
+                                    </Viewbox>
+                                    <Viewbox Grid.Column="3" HorizontalAlignment="Left">
+                                        <Label Content="{Binding TotalPointsString}"/>
+                                    </Viewbox>
+                                    <Viewbox Grid.Column="4" HorizontalAlignment="Left">
+                                        <Label Content="{Binding DeltaPointsString}"/>
+                                    </Viewbox>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Grid.Row="5" Background="LightGray">
+                <Viewbox>
+                    <Label Content="Up Next"/>
+                </Viewbox>
+            </Border>
+
+            <ItemsControl Grid.Row="6" Name="UpNextControl" Tag="{Binding .}" HorizontalContentAlignment="Stretch">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Border>
+                                <Grid Height="{Binding Tag.TeamDisplayHeight, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="3*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Viewbox HorizontalAlignment="Left">
+                                        <Label Content="{Binding OnDeckNumberString}"/>
+                                    </Viewbox>
+                                    <Viewbox Grid.Column="1" HorizontalAlignment="Left">
+                                        <Label Content="{Binding PlayerNames}"/>
+                                    </Viewbox>
+                                    <Viewbox Grid.Column="3" HorizontalAlignment="Left">
+                                        <Label Content="{Binding EstimatedTimeToPlayString}"/>
+                                    </Viewbox>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Grid>
+    </Border>
 </Window>
