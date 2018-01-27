@@ -85,44 +85,26 @@ namespace CommonClasses
 		}
 	}
 
-	[ProtoContract]
-	public class ScoreData
-	{
-		[ProtoMember(1)]
-		public float Score = 0f;
-
-		public ScoreData()
-		{
-		}
-	}
 
 	[ProtoContract]
-	public class ScoreUpdateData
+	public class ScoreSplitData
 	{
 		[ProtoMember(1)]
 		public ClientIdData Judge = null;
-
 		[ProtoMember(2)]
-		public ScoreData Score = new ScoreData();
+		public float DialValue = 0f;
+		[ProtoMember(3)]
+		public float TotalPoints = 0f;
 
-		public ScoreUpdateData()
+		public ScoreSplitData()
 		{
 		}
 
-		public ScoreUpdateData(ClientIdData id, float score)
+		public ScoreSplitData(ClientIdData id, float score, float totalScore)
 		{
 			Judge = id;
-			Score.Score = score;
-		}
-	}
-
-	public class RoutineData
-	{
-		public ClientIdData Judge = null;
-		public List<ScoreData> Scores = new List<ScoreData>();
-
-		public RoutineData()
-		{
+			DialValue = score;
+			TotalPoints = totalScore;
 		}
 	}
 
@@ -179,8 +161,7 @@ namespace CommonClasses
 	public class JudgeData
 	{
 		[ProtoMember(1)]
-		public string JudgeName = "";
-
+		public string JudgeName = "No Judge Set";
 		[ProtoMember(2)]
 		public ECategory Category = ECategory.General;
 
@@ -245,7 +226,7 @@ namespace CommonClasses
 			return GetTotalScore(0f);
 		}
 
-		public float GetTotalScore(float additionalSeconds)
+		public float GetTotalScore(float routineLengthSeconds)
 		{
 			float total = 0f;
 
@@ -259,11 +240,11 @@ namespace CommonClasses
 				total += timeDelta * first.DialScore;
 			}
 
-			if (additionalSeconds > 0f && DialInputs.Count > 0)
+			if (routineLengthSeconds > 0f && DialInputs.Count > 0)
 			{
 				DialInputData last = DialInputs.Last();
 
-				total += additionalSeconds * last.DialScore;
+				total += (routineLengthSeconds - last.TimeSeconds) * last.DialScore;
 			}
 
 			return total;
@@ -381,6 +362,7 @@ namespace CommonClasses
 		{
 			UpdateRoutineTimeTimer.Stop();
 
+			UpdateCallback();
 			FinishCallback();
 		}
 

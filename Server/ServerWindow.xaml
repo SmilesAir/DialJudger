@@ -8,6 +8,51 @@
         Title="Server" Height="800" Width="1200"
         Loaded="Window_Loaded"
         Closed="Window_Closed">
+
+    <Window.Resources>
+        <Style x:Key="TeamsHintTextBoxStyle" TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+            <Style.Resources>
+                <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Top" Stretch="None">
+                    <VisualBrush.Visual>
+                        <Label Content="One team per line. Player names separated by comma.&#x0a;Example below:&#x0a;Ryan Young, James Wiseman&#x0a;Jake Gauthier, Matt Gauthier" Foreground="Gray" />
+                    </VisualBrush.Visual>
+                </VisualBrush>
+            </Style.Resources>
+            <Style.Triggers>
+                <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
+                    <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                </Trigger>
+                <Trigger Property="Text" Value="{x:Null}">
+                    <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="Background" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        
+        <Style x:Key="JudgesHintTextBoxStyle" TargetType="TextBox" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+            <Style.Resources>
+                <VisualBrush x:Key="CueBannerBrush" AlignmentX="Left" AlignmentY="Top" Stretch="None">
+                    <VisualBrush.Visual>
+                        <Label Content="One judge per line. Format is JUDGE NAME, CATEGORY&#x0a;Categories are: General, ArtisticImpression, Execution, Difficulty&#x0a;Example below:&#x0a;Ryan Young, Difficulty&#x0a;James Wiseman, ArtisticImpression" Foreground="Gray" />
+                    </VisualBrush.Visual>
+                </VisualBrush>
+            </Style.Resources>
+            <Style.Triggers>
+                <Trigger Property="Text" Value="{x:Static sys:String.Empty}">
+                    <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                </Trigger>
+                <Trigger Property="Text" Value="{x:Null}">
+                    <Setter Property="Background" Value="{StaticResource CueBannerBrush}" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="Background" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+    
     <Grid Name="TopLevelGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -18,6 +63,7 @@
 
         <Menu>
             <MenuItem Header="_File">
+                <MenuItem Header="_Open" Click="Open_Click"/>
                 <MenuItem Header="_Save" Click="SaveButton_Click"/>
                 <MenuItem Header="S_ave As"/>
                 <MenuItem Header="E_xit" Click="MenuItemExit_Click"/>
@@ -45,13 +91,13 @@
 
                 <Label Content="Teams" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="LightBlue" Margin="1,0,1,0"/>
                 <ScrollViewer Grid.Row="1" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
-                    <TextBox Name="TeamsTextBox" AcceptsReturn="True"/>
+                    <TextBox Name="TeamsTextBox" AcceptsReturn="True" Style="{StaticResource TeamsHintTextBoxStyle}"/>
                 </ScrollViewer>
                 <Button Grid.Row="1" Content="Import" Click="ImportTeamsButton_Click" Width="50" Height="25" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
 
                 <Label Grid.Row="2" Content="Judges" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="LightBlue"/>
                 <ScrollViewer Grid.Row="3" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
-                    <TextBox Name="JudgesTextBox" AcceptsReturn="True"/>
+                    <TextBox Name="JudgesTextBox" AcceptsReturn="True" Style="{StaticResource JudgesHintTextBoxStyle}"/>
                 </ScrollViewer>
                 <Button Grid.Row="3" Content="Import" Click="ImportJudgesButton_Click"  Width="50" Height="25" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
             </Grid>
@@ -118,6 +164,8 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
@@ -128,6 +176,8 @@
                                     <Label Grid.Column="4" Content="Rank:" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
                                     <Label Grid.Column="5" Content="{Binding RankString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
                                     <Label Grid.Column="6" Content="{Binding DetailedJudgeScoresString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
+                                    <ToggleButton Grid.Column="7" Content="Scratch" IsChecked="{Binding IsScratch}"/>
+                                    <Button Grid.Column="8" Content="Clear Scores" Tag="{Binding}" Click="ClearScores_Click"/>
                                 </Grid>
                             </Border>
                         </Grid>

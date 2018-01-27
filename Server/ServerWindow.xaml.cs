@@ -32,6 +32,7 @@ namespace Server
 	public partial class MainWindow : Window, INotifyPropertyChanged
 	{
 		public static MainWindow ServerWindow = null;
+		System.Timers.Timer SendSplitTimer = new System.Timers.Timer();
 		static string ListeningUrl = "";
 		static public ClientList Clients = new ClientList();
 		SaveData SaveDataInst = new SaveData();
@@ -44,8 +45,10 @@ namespace Server
 			{
 				routineLengthMinutes = value;
 				RoutineTimer.RoutineLengthMinutes = value;
+				SaveDataInst.RoutineLengthMinutes = value;
 
 				NotifyPropertyChanged("RoutineLengthMinutes");
+				NotifyPropertyChanged("TimeRemainingString");
 			}
 		}
 		TeamData currentPlayingTeam = null;
@@ -150,12 +153,20 @@ namespace Server
 		public MainWindow()
 		{
 			ServerWindow = this;
+			if (File.Exists(Properties.Settings.Default.LastSaveFilenamePath))
+			{
+				SaveFilename = Properties.Settings.Default.LastSaveFilenamePath;
+			}
 
 			InitializeComponent();
 		}
 
 		private void Window_Loaded(object sender, RoutedEventArgs e)
 		{
+			SendSplitTimer.Interval = 500;
+			SendSplitTimer.AutoReset = true;
+			SendSplitTimer.Elapsed += SendSplitTimer_Elapsed;
+
 			AppendHandlers();
 
 			JudgesControl.ItemsSource = Clients.Clients;
@@ -192,6 +203,27 @@ namespace Server
 			RoutineLengthMinutes = routineLengthMinutes;
 		}
 
+		private void SendSplitTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+		{
+			float totalPoints = 0f;
+
+			foreach (ClientData cd in Clients.Clients)
+			{
+				if (cd.ClientId.ClientType == EClientType.Judge && cd.LastSplit != null)
+				{
+					totalPoints += cd.LastSplit.TotalPoints;
+				}
+			}
+
+			foreach (ClientData cd in Clients.Clients)
+			{
+				if (cd.ClientId.ClientType == EClientType.Scoreboard)
+				{
+					cd.ConnectionData.SendObject("ServerSendSplit", totalPoints);
+				}
+			}
+		}
+
 		private void AppendHandlers()
 		{
 			NetworkComms.AppendGlobalConnectionEstablishHandler(OnConnectionEstablished);
@@ -199,7 +231,7 @@ namespace Server
 
 			NetworkComms.AppendGlobalIncomingPacketHandler<int>("BroadcastFindServer", HandleBroadcastFindServer);
 			NetworkComms.AppendGlobalIncomingPacketHandler<ClientIdData>("ClientConnect", HandleClientConnect);
-			NetworkComms.AppendGlobalIncomingPacketHandler<ScoreUpdateData>("JudgeScoreUpdate", HandleJudgeScoreUpdate);
+			NetworkComms.AppendGlobalIncomingPacketHandler<ScoreSplitData>("JudgeScoreUpdate", HandleJudgeScoreUpdate);
 			NetworkComms.AppendGlobalIncomingPacketHandler<DialRoutineScoreData>("JudgeFinishedScore", HandleJudgeFinishedScore);
 			NetworkComms.AppendGlobalIncomingPacketHandler<DialRoutineScoreData>("JudgeSendBackupScore", HandleJudgeSendBackupScore);
 		}
@@ -217,12 +249,13 @@ namespace Server
 
 				if (clientInfo.ClientType == EClientType.Scoreboard)
 				{
+					// Init the new scorboard
 					ServerWindow.SendUpdatesToScoreboard();
 				}
 			}));
 		}
 
-		private static void HandleJudgeScoreUpdate(PacketHeader header, Connection connection, ScoreUpdateData scoreUpdate)
+		private static void HandleJudgeScoreUpdate(PacketHeader header, Connection connection, ScoreSplitData scoreUpdate)
 		{
 			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
 			{
@@ -280,13 +313,16 @@ namespace Server
 
 			foreach (TeamData team in sortedTeams)
 			{
-				ScoreboardTeamResultData teamResult = new ScoreboardTeamResultData();
+				if (!team.IsScratch)
+				{
+					ScoreboardTeamResultData teamResult = new ScoreboardTeamResultData();
 
-				teamResult.PlayerNames = team.PlayerNamesString;
-				teamResult.Rank = team.Rank;
-				teamResult.TotalPoints = team.TotalScore;
+					teamResult.PlayerNames = team.PlayerNamesString;
+					teamResult.Rank = team.Rank;
+					teamResult.TotalPoints = team.TotalScore;
 
-				results.Results.Add(teamResult);
+					results.Results.Add(teamResult);
+				}
 			}
 
 			foreach (ClientData cd in Clients.Clients)
@@ -303,7 +339,7 @@ namespace Server
 			List<TeamData> upNextTeams = new List<TeamData>();
 			foreach (TeamData team in SaveDataInst.TeamList)
 			{
-				if (team.Rank == 0)
+				if (team.Rank == 0 && team != CurrentPlayingTeam && !team.IsScratch)
 				{
 					upNextTeams.Add(team);
 				}
@@ -336,14 +372,19 @@ namespace Server
 
 		private static void OnConnectionClosed(Connection connection)
 		{
-			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			if (Application.Current != null)
 			{
-				Clients.Remove(connection);
-			}));
+				Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+				{
+					Clients.Remove(connection);
+				}));
+			}
 		}
 
 		private void Window_Closed(object sender, EventArgs e)
 		{
+			Save();
+
 			NetworkComms.Shutdown();
 		}
 
@@ -360,17 +401,36 @@ namespace Server
 
 		private void SetPlayingTeam(TeamData playingTeam)
 		{
-			CurrentPlayingTeam = playingTeam;
-
-			foreach (TeamData td in SaveDataInst.TeamList)
+			bool bCancel = false;
+			if (playingTeam.HasScores)
 			{
-				td.IsPlaying = td == playingTeam;
+				if (MessageBox.Show("This team has scores! Do you want to overwrite scores for:\r\n" + playingTeam.PlayerNamesString + "?", "Attention!",
+				MessageBoxButton.OKCancel) == MessageBoxResult.OK)
+				{
+					ClearTeamScores(playingTeam);
+				}
+				else
+				{
+					bCancel = true;
+				}
 			}
 
-			InitRoutineData routineData = new InitRoutineData(playingTeam == null ? "No Team" : playingTeam.PlayerNamesString, RoutineLengthMinutes);
-			foreach (Connection connection in NetworkComms.GetExistingConnection())
+			if (!bCancel)
 			{
-				connection.SendObject("ServerSetPlayingTeam", routineData);
+				CurrentPlayingTeam = playingTeam;
+
+				foreach (TeamData td in SaveDataInst.TeamList)
+				{
+					td.IsPlaying = td == playingTeam;
+				}
+
+				InitRoutineData routineData = new InitRoutineData(playingTeam == null ? "No Team" : playingTeam.PlayerNamesString, RoutineLengthMinutes);
+				foreach (Connection connection in NetworkComms.GetExistingConnection())
+				{
+					connection.SendObject("ServerSetPlayingTeam", routineData);
+				}
+
+				SendUpdatesToScoreboard();
 			}
 		}
 
@@ -421,6 +481,8 @@ namespace Server
 				{
 					connection.SendObject("ServerStartRoutine", routineData);
 				}
+
+				SendSplitTimer.Start();
 			}
 		}
 
@@ -434,19 +496,15 @@ namespace Server
 			{
 				connection.SendObject("ServerCancelRoutine", "");
 			}
+
+			SendSplitTimer.Stop();
 		}
 
 		void UpdateJudgesForClients()
 		{
-			// Parse the Judges text
-
-			//List<JudgeData> newJudges = new List<JudgeData>();
-			//newJudges.Add(new JudgeData("Randy Silvey", ECategory.General));
-			//newJudges.Add(new JudgeData("Bob Boulware", ECategory.General));
-
-			for (int judgeIndex = 0, clientIndex = 0; judgeIndex < SaveDataInst.ImportedJudges.Count && clientIndex < Clients.Clients.Count; ++clientIndex)
+			for (int clientIndex = 0, judgeIndex = 0; clientIndex < Clients.Clients.Count; ++clientIndex)
 			{
-				JudgeData jd = SaveDataInst.ImportedJudges[judgeIndex];
+				JudgeData jd = judgeIndex < SaveDataInst.ImportedJudges.Count ? SaveDataInst.ImportedJudges[judgeIndex] : new JudgeData();
 				ClientData cd = Clients.Clients[clientIndex];
 
 				if (cd.ClientId.ClientType == EClientType.Judge)
@@ -506,21 +564,29 @@ namespace Server
 		public void TryIncrementPlayingTeam()
 		{
 			var teamList = SaveDataInst.TeamList;
+			bool bFoundLastPlayedTeam = false;
 			for (int i = 0; i < teamList.Count; ++i)
 			{
 				TeamData team = teamList[i];
-				if (CurrentPlayingTeam == team)
+				bFoundLastPlayedTeam |= CurrentPlayingTeam == team;
+				if (bFoundLastPlayedTeam)
 				{
 					if (i < teamList.Count - 1)
 					{
-						SetPlayingTeam(teamList[i + 1]);
+						TeamData nextTeam = teamList[i + 1];
+						if (!nextTeam.IsScratch && !nextTeam.HasScores)
+						{
+							SetPlayingTeam(nextTeam);
+
+							return;
+						}
 					}
 					else
 					{
 						SetPlayingTeam(null);
-					}
 
-					return;
+						return;
+					}
 				}
 			}
 		}
@@ -538,6 +604,7 @@ namespace Server
 			while ((line = text.ReadLine()) != null)
 			{
 				TeamData newTeam = new TeamData();
+				newTeam.UpdateAllTeamScores = OnTeamScoreUpdate;
 
 				string[] names = line.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
 				foreach (string name in names)
@@ -566,16 +633,25 @@ namespace Server
 		void ImportJudgesFromTextbox()
 		{
 			// Check if we are overriding data
+			if (SaveDataInst.ImportedJudges.Count > 0)
+			{
+				if (MessageBox.Show("Overriding old Judges! Continue?", "Attention!",
+					MessageBoxButton.OKCancel) == MessageBoxResult.Cancel)
+				{
+					return;
+				}
+			}
+
+			SaveDataInst.ImportedJudges.Clear();
 
 			string[] splitters = { ",", "-", "/", "|" };
 			StringReader text = new StringReader(JudgesTextBox.Text);
 
+			bool bImportError = false;
 			string line = null;
 			while ((line = text.ReadLine()) != null)
 			{
 				string[] judgeParams = line.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
-
-				bool bImportError = false;
 				if (judgeParams.Length == 2)
 				{
 					ECategory judgeCategory;
@@ -587,20 +663,24 @@ namespace Server
 					{
 						// Parse Error
 						bImportError = true;
+
+						MessageBox.Show("Failed to import line (Unknown category):\r\n" + line, "Attention!");
 					}
 				}
 				else
 				{
 					// Parse Error
 					bImportError = true;
-				}
 
-				if (!bImportError)
-				{
-					UpdateJudgesForClients();
-
-					Save();
+					MessageBox.Show("Failed to import line (Incorrect comma usage):\r\n" + line, "Attention!");
 				}
+			}
+
+			if (!bImportError)
+			{
+				UpdateJudgesForClients();
+
+				Save();
 			}
 		}
 
@@ -616,11 +696,13 @@ namespace Server
 					{
 						saveFile.Write(retString.ToString());
 					}
+
+					SaveLastFilenamePath();
 				}
 			}
-			catch
+			catch (Exception e)
 			{
-				// Popup error
+				MessageBox.Show("Failed to Save.\r\n" + e.Message, "Attention!");
 			}
 		}
 
@@ -628,6 +710,8 @@ namespace Server
 		{
 			try
 			{
+				SaveDataInst.ClearData();
+
 				if (File.Exists(SaveFilename))
 				{
 					using (StreamReader saveFile = new StreamReader(SaveFilename))
@@ -640,17 +724,30 @@ namespace Server
 						foreach (TeamData td in SaveDataInst.TeamList)
 						{
 							td.IsPlaying = false;
+							td.UpdateAllTeamScores = OnTeamScoreUpdate;
 						}
+
+						UpdateTeamsRank();
+
+						RoutineLengthMinutes = SaveDataInst.RoutineLengthMinutes;
 
 						UpdateJudgesForClients();
 						UpdateResultsText();
+
+						SaveLastFilenamePath();
 					}
 				}
 			}
-			catch
+			catch (Exception e)
 			{
-				// Popup error
+				MessageBox.Show("Failed to Load.\r\n" + e.Message, "Attention!");
 			}
+		}
+
+		private void SaveLastFilenamePath()
+		{
+			Properties.Settings.Default.LastSaveFilenamePath = System.IO.Path.GetFullPath(SaveFilename);
+			Properties.Settings.Default.Save();
 		}
 
 		private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -660,6 +757,8 @@ namespace Server
 
 		public void OnFinishRoutineTimer()
 		{
+			SendSplitTimer.Stop();
+
 			NotifyPropertyChanged("TimeRemainingString");
 		}
 
@@ -667,13 +766,83 @@ namespace Server
 		{
 			NotifyPropertyChanged("TimeRemainingString");
 		}
+
+		private void ClearScores_Click(object sender, RoutedEventArgs e)
+		{
+			TeamData td = (sender as Button).Tag as TeamData;
+
+			if (MessageBox.Show("Are you sure you want to Clear Scores for team:\r\n" + td.PlayerNamesString + "?", "Attention!", 
+				MessageBoxButton.OKCancel) == MessageBoxResult.OK)
+			{
+				ClearTeamScores(td);
+			}
+		}
+
+		private void ClearTeamScores(TeamData team)
+		{
+			team.ClearScores(SaveDataInst.TeamList);
+
+			SendUpdatesToScoreboard();
+
+			UpdateResultsText();
+		}
+
+		public void UpdateTeamsRank()
+		{
+			foreach (TeamData team1 in SaveDataInst.TeamList)
+			{
+				float score1Total = team1.TotalScore;
+				int rank = 1;
+				if (team1.Scores.Count > 0 && !team1.IsScratch)
+				{
+					foreach (TeamData team2 in SaveDataInst.TeamList)
+					{
+						if (score1Total < team2.TotalScore && !team2.IsScratch)
+						{
+							++rank;
+						}
+					}
+
+					team1.Rank = rank;
+				}
+				else
+				{
+					team1.Rank = 0;
+				}
+			}
+		}
+
+		public void OnTeamScoreUpdate()
+		{
+			UpdateTeamsRank();
+
+			SendUpdatesToScoreboard();
+
+			UpdateResultsText();
+
+			Save();
+		}
+
+		private void Open_Click(object sender, RoutedEventArgs e)
+		{
+			Microsoft.Win32.OpenFileDialog ofd = new Microsoft.Win32.OpenFileDialog();
+			ofd.DefaultExt = ".txt";
+			ofd.Filter = "Text Files (*.txt)|*.txt";
+			ofd.Multiselect = false;
+
+			if (ofd.ShowDialog() == true)
+			{
+				SaveFilename = ofd.FileName;
+
+				Load();
+			}
+		}
 	}
 
 	public class ClientData : INotifyPropertyChanged
 	{
 		public Connection ConnectionData = null;
 		public ClientIdData ClientId = null;
-		public RoutineData RoutineScores = new RoutineData();
 		JudgeData judge = null;
 		public JudgeData Judge
 		{
@@ -689,18 +858,24 @@ namespace Server
 		private float lastJudgeValue = CommonValues.InvalidScore;
 		public float LastJudgeValue
 		{
-			get { return lastJudgeValue; }
-			set
-			{
-				lastJudgeValue = value;
-
-				NotifyPropertyChanged("LastJudgeValue");
-				NotifyPropertyChanged("JudgeValue");
-			}
+			get { return LastSplit != null ? LastSplit.DialValue : -1f; }
 		}
 		public string ClientTypeString
 		{
 			get { return ClientId.ClientType.ToString(); }
+		}
+		ScoreSplitData lastSplit = null;
+		public ScoreSplitData LastSplit
+		{
+			get { return lastSplit; }
+			set
+			{
+				lastSplit = value;
+
+				NotifyPropertyChanged("LastSplit");
+				NotifyPropertyChanged("LastJudgeValue");
+				NotifyPropertyChanged("JudgeValue");
+			}
 		}
 
 		// Display
@@ -770,6 +945,11 @@ namespace Server
 			}
 		}
 
+		public void RemoveNull()
+		{
+
+		}
+
 		public void SetJudgeId(Connection connection, ClientIdData id)
 		{
 			foreach (ClientData cd in Clients)
@@ -782,13 +962,25 @@ namespace Server
 			}
 		}
 
-		public void SetLastJudgeScore(ScoreUpdateData scoreUpdate)
+		public void SetSplit(Connection connection, ScoreSplitData split)
 		{
 			foreach (ClientData cd in Clients)
 			{
-				if (cd.ClientId.CompareTo(scoreUpdate.Judge))
+				if (cd.ConnectionData == connection)
 				{
-					cd.LastJudgeValue = scoreUpdate.Score.Score;
+					cd.LastSplit = split;
+					return;
+				}
+			}
+		}
+
+		public void SetLastJudgeScore(ScoreSplitData split)
+		{
+			foreach (ClientData cd in Clients)
+			{
+				if (cd.ClientId.CompareTo(split.Judge))
+				{
+					cd.LastSplit = split;
 
 					return;
 				}
@@ -835,6 +1027,8 @@ namespace Server
 			}
 		}
 		public List<DialRoutineScoreData> Scores = new List<DialRoutineScoreData>();
+		[XmlIgnoreAttribute]
+		public Action UpdateAllTeamScores;
 		int rank = 0;
 		public int Rank
 		{
@@ -844,6 +1038,7 @@ namespace Server
 				rank = value;
 				NotifyPropertyChanged("Rank");
 				NotifyPropertyChanged("RankString");
+				NotifyPropertyChanged("DetailedJudgeScoresString");
 			}
 		}
 		public string RankString
@@ -890,38 +1085,32 @@ namespace Server
 					ret += score.JudgeName + ": " + score.GetScoreString() + "  ";
 				}
 
+				ret += IsScratch ? "SCRATCHED" : "";
+
 				return ret;
 			}
 		}
-
-		void UpdateRank(ObservableCollection<TeamData> teamList)
+		bool bIsScratch = false;
+		public bool IsScratch
 		{
-			foreach (TeamData team1 in teamList)
+			get { return bIsScratch; }
+			set
 			{
-				float score1Total = team1.TotalScore;
-				int rank = 1;
-				if (score1Total > 0)
-				{
-					foreach (TeamData team2 in teamList)
-					{
-						if (score1Total < team2.TotalScore)
-						{
-							++rank;
-						}
-					}
+				bIsScratch = value;
 
-					team1.Rank = rank;
-				}
-				else
-				{
-					team1.Rank = 0;
-				}
+				NotifyPropertyChanged("IsScratch");
+
+				UpdateAfterScoreUpdate();
 			}
 		}
+		public bool HasScores { get { return TotalScore > 0; } }
 
-		void UpdateAfterScoreUpdate(ObservableCollection<TeamData> teamList)
+		void UpdateAfterScoreUpdate()
 		{
-			UpdateRank(teamList);
+			if (UpdateAllTeamScores != null)
+			{
+				UpdateAllTeamScores();
+			}
 
 			NotifyPropertyChanged("TotalScoreString");
 			NotifyPropertyChanged("DetailedJudgeScoresString");
@@ -937,7 +1126,7 @@ namespace Server
 				{
 					Scores[i] = newScore;
 
-					UpdateAfterScoreUpdate(teamList);
+					UpdateAfterScoreUpdate();
 
 					return;
 				}
@@ -945,7 +1134,14 @@ namespace Server
 
 			Scores.Add(newScore);
 
-			UpdateAfterScoreUpdate(teamList);
+			UpdateAfterScoreUpdate();
+		}
+
+		public void ClearScores(ObservableCollection<TeamData> teamList)
+		{
+			Scores.Clear();
+
+			UpdateAfterScoreUpdate();
 		}
 	}
 
@@ -954,5 +1150,12 @@ namespace Server
 		public ObservableCollection<TeamData> TeamList = new ObservableCollection<TeamData>();
 		public List<JudgeData> ImportedJudges = new List<JudgeData>();
 		public float RoutineLengthMinutes = 3f;
+
+		public void ClearData()
+		{
+			TeamList.Clear();
+			ImportedJudges.Clear();
+			RoutineLengthMinutes = 3f;
+		}
 	}
 }

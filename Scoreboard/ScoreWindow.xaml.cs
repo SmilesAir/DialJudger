@@ -52,13 +52,14 @@ namespace Scoreboard
 		}
 		public ObservableCollection<TeamResultsData> ResultsList = new ObservableCollection<TeamResultsData>();
 		public ObservableCollection<UpNextData> UpNextList = new ObservableCollection<UpNextData>();
+		RoutineTimers RoutineTimer;
 		public double TeamDisplayHeight
 		{
 			get { return ActualHeight / 14f; }
 		}
 		public double PointsDeltaWidth
 		{
-			get { return ActualWidth / 8f; }
+			get { return ActualWidth / 6f; }
 		}
 		float routineLengthMinutes = .1f;
 		public float RoutineLengthMinutes
@@ -72,10 +73,47 @@ namespace Scoreboard
 			}
 		}
 		public float BetweenTeamBufferMinutes = 1f;
+		float splitPoints = 0f;
+		public float SplitPoints
+		{
+			get { return splitPoints; }
+			set
+			{
+				splitPoints = value;
+
+				NotifyPropertyChanged("SplitPoints");
+				NotifyPropertyChanged("SplitPointsString");
+				NotifyPropertyChanged("SplitDeltaPointsString");
+			}
+		}
+		public string SplitPointsString
+		{
+			get { return SplitPoints > 0f ? "Current Points: " + SplitPoints.ToString("0.0") : ""; }
+		}
+		public float LeaderPoints
+		{
+			get { return ResultsList.Count > 0 ? ResultsList.First().TotalPoints : 0f; }
+		}
+		public string SplitDeltaPointsString
+		{
+			get
+			{
+				float leaderSplitAverage = (float)(LeaderPoints / (RoutineLengthMinutes * 60f) * RoutineTimer.ElapsedSeconds);
+				float delta = SplitPoints - leaderSplitAverage;
+
+				return SplitPoints > 0f ? "Delta Split: " + delta.ToString("0.0") : "";
+			}
+		}
+		public string RoutineTimeString
+		{
+			get { return RoutineTimer.IsRoutinePlaying ? "Time: " + RoutineTimer.RemainingTimeString : ""; }
+		}
 
 		public MainWindow()
 		{
 			InitializeComponent();
+
+			RoutineTimer = new RoutineTimers(() => { }, () => { NotifyPropertyChanged("RoutineTimeString"); });
 		}
 
 		private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -96,19 +134,25 @@ namespace Scoreboard
 			NetworkComms.AppendGlobalIncomingPacketHandler<string>("ServerCancelRoutine", (h, c, x) => HandleCancelRoutine(x));
 			NetworkComms.AppendGlobalIncomingPacketHandler<ScoreboardResultsData>("ServerSendResults", (h, c, x) => HandleServerResults(x));
 			NetworkComms.AppendGlobalIncomingPacketHandler<ScoreboardUpNextData>("ServerSendUpNextTeams", (h, c, x) => HandleServerUpNextTeams(x));
+			NetworkComms.AppendGlobalIncomingPacketHandler<float>("ServerSendSplit", (h, c, x) => HandleServerSendSplit(x));
 		}
 
 		private void HandleStartRoutine(InitRoutineData startData)
 		{
+			RoutineLengthMinutes = startData.RoutineLengthMinutes;
+			RoutineTimer.StartRoutine(RoutineLengthMinutes);
 		}
 
 		private void HandleSetPlayingTeam(InitRoutineData startData)
 		{
 			CurrentPlayingPlayerNames = startData.PlayersNames;
+			RoutineLengthMinutes = startData.RoutineLengthMinutes;
+			SplitPoints = 0f;
 		}
 
 		private void HandleCancelRoutine(string param)
 		{
+			RoutineTimer.StopRoutine();
 		}
 
 		private void HandleServerResults(ScoreboardResultsData results)
@@ -154,6 +198,14 @@ namespace Scoreboard
 			}));
 		}
 
+		private void HandleServerSendSplit(float split)
+		{
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			{
+				SplitPoints = split;
+			}));
+		}
+
 		private void Window_MouseDoubleClick(object sender, MouseButtonEventArgs e)
 		{
 			if (this.WindowState == System.Windows.WindowState.Normal)
@@ -169,6 +221,18 @@ namespace Scoreboard
 		private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
 		{
 			NotifyPropertyChanged("TeamDisplayHeight");
+		}
+
+		private void Window_StateChanged(object sender, EventArgs e)
+		{
+			if (this.WindowState == WindowState.Maximized)
+			{
+				this.WindowStyle = WindowStyle.None;
+			}
+			else
+			{
+				this.WindowStyle = WindowStyle.SingleBorderWindow;
+			}
 		}
 	}
 
@@ -287,7 +351,7 @@ namespace Scoreboard
 		}
 		public string OnDeckNumberString
 		{
-			get { return OnDeckNumber.ToString(); }
+			get { return OnDeckNumber.ToString() + "."; }
 		}
 		int etaMinutesToPlay = 0;
 		public int EtaMinutesToPlay

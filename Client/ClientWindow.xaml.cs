@@ -104,12 +104,7 @@ namespace Client
 		{
 			get
 			{
-				float additionalSeconds = 0f;
-				if (IsJudging && RoutineScore.DialInputs.Count > 0)
-				{
-					additionalSeconds = (float)(RoutineTimer.ElapsedSeconds - RoutineScore.DialInputs.Last().TimeSeconds);
-				}
-				return "Total Score: " + RoutineScore.GetTotalScore(additionalSeconds).ToString("0.0");
+				return "Total Score: " + RoutineScore.GetTotalScore((float)RoutineTimer.ElapsedSeconds).ToString("0.0");
 			}
 		}
 		SpeechSynthesizer Speech = new SpeechSynthesizer();
@@ -322,7 +317,7 @@ namespace Client
 			if (IsConnected)
 			{
 				NetworkComms.SendObject("JudgeScoreUpdate", ClientCon.ServerIp, ClientCon.ServerPort,
-					new ScoreUpdateData(ClientId, DialValue));
+					new ScoreSplitData(ClientId, DialValue, RoutineScore.GetTotalScore((float)RoutineTimer.ElapsedSeconds)));
 			}
 		}
 

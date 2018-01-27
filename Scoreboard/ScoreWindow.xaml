@@ -7,12 +7,10 @@
         mc:Ignorable="d"
         Title="MainWindow"
         Height="720" Width="1280"
-        WindowStyle="None"
-        AllowsTransparency="True"
-        ResizeMode="CanResizeWithGrip"
         Loaded="Window_Loaded"
         MouseDoubleClick="Window_MouseDoubleClick"
-        SizeChanged="Window_SizeChanged">
+        SizeChanged="Window_SizeChanged"
+        StateChanged="Window_StateChanged">
 
     <Border BorderBrush="Gray" BorderThickness="1">
         <Grid Name="TopLevelGrid" Background="AntiqueWhite">
@@ -26,9 +24,20 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <Viewbox>
-                <Label Content="{Binding TournamentTitle}"/>
-            </Viewbox>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <Viewbox Grid.ColumnSpan="2">
+                    <Label Content="{Binding TournamentTitle}"/>
+                </Viewbox>
+
+                <Viewbox Grid.Column="1">
+                    <Label Content="{Binding RoutineTimeString}"/>
+                </Viewbox>
+            </Grid>
 
             <Border Grid.Row="1" Background="LightGray">
                 <Viewbox>
@@ -81,10 +90,10 @@
                                     <Viewbox Grid.Column="1" HorizontalAlignment="Left">
                                         <Label Content="{Binding PlayerNames}"/>
                                     </Viewbox>
-                                    <Viewbox Grid.Column="3" HorizontalAlignment="Left">
+                                    <Viewbox Grid.Column="3" HorizontalAlignment="Right">
                                         <Label Content="{Binding TotalPointsString}"/>
                                     </Viewbox>
-                                    <Viewbox Grid.Column="4" HorizontalAlignment="Left">
+                                    <Viewbox Grid.Column="4" HorizontalAlignment="Right">
                                         <Label Content="{Binding DeltaPointsString}"/>
                                     </Viewbox>
                                 </Grid>
