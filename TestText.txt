@@ -15,5 +15,4 @@ Bob Boulware, General
 Randy Silvey, Difficulty
 
 
-Time call reminder
 exception files in bins folder

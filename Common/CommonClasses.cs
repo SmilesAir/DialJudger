@@ -336,7 +336,7 @@ namespace CommonClasses
 			get
 			{
 				double remainingSeconds = IsRoutinePlaying ? RemainingSeconds : RoutineLengthMinutes * 60f;
-				return string.Format("{0:0}:{1:00}", remainingSeconds / 60, remainingSeconds % 60);
+				return string.Format("{0:0}:{1:00}", (int)((remainingSeconds + 1f) / 60), ((int)Math.Round(remainingSeconds)) % 60);
 			}
 		}
 

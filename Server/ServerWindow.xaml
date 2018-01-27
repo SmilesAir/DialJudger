@@ -164,9 +164,16 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
                                     <Button Content="Set Playing" Tag="{Binding}" Click="SetPlayingTeam_Click"/>
@@ -176,8 +183,14 @@
                                     <Label Grid.Column="4" Content="Rank:" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
                                     <Label Grid.Column="5" Content="{Binding RankString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
                                     <Label Grid.Column="6" Content="{Binding DetailedJudgeScoresString}" HorizontalContentAlignment="Center" HorizontalAlignment="Stretch"/>
-                                    <ToggleButton Grid.Column="7" Content="Scratch" IsChecked="{Binding IsScratch}"/>
-                                    <Button Grid.Column="8" Content="Clear Scores" Tag="{Binding}" Click="ClearScores_Click"/>
+                                    <ToggleButton Grid.Column="8" Content="Scratch" IsChecked="{Binding IsScratch}"/>
+                                    <Button Grid.Column="9" Content="Clear Scores" Tag="{Binding}" Click="ClearScores_Click"/>
+                                    <Label Grid.Column="11" Content="Time Calls:"/>
+                                    <ToggleButton Grid.Column="12" Content="10s" IsChecked="{Binding TimeCall10sEnabled}" Padding="5, 0, 5, 0"/>
+                                    <ToggleButton Grid.Column="13" Content="15s" IsChecked="{Binding TimeCall15sEnabled}" Padding="5, 0, 5, 0"/>
+                                    <ToggleButton Grid.Column="14" Content="20s" IsChecked="{Binding TimeCall20sEnabled}" Padding="5, 0, 5, 0"/>
+                                    <ToggleButton Grid.Column="15" Content="30s" IsChecked="{Binding TimeCall30sEnabled}" Padding="5, 0, 5, 0"/>
+                                    <ToggleButton Grid.Column="16" Content="1m" IsChecked="{Binding TimeCall1mEnabled}" Padding="5, 0, 5, 0"/>
                                 </Grid>
                             </Border>
                         </Grid>

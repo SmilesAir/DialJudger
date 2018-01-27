@@ -23,6 +23,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.Xml.Serialization;
+using System.Speech.Synthesis;
 
 namespace Server
 {
@@ -68,6 +69,8 @@ namespace Server
 		float CancelRoutineTimeLimit = .4f;
 		DateTime CancelRoutineClickTime;
 		float StartAfterCancelTimeLimit = .75f;
+		List<System.Timers.Timer> TimeCallTimers = new List<System.Timers.Timer>();
+		SpeechSynthesizer Speech = new SpeechSynthesizer();
 
 		public string NowPlayingString
 		{
@@ -157,6 +160,8 @@ namespace Server
 			{
 				SaveFilename = Properties.Settings.Default.LastSaveFilenamePath;
 			}
+
+			Speech.SetOutputToDefaultAudioDevice();
 
 			InitializeComponent();
 		}
@@ -401,6 +406,11 @@ namespace Server
 
 		private void SetPlayingTeam(TeamData playingTeam)
 		{
+			if (RoutineTimer.IsRoutinePlaying)
+			{
+				return;
+			}
+
 			bool bCancel = false;
 			if (playingTeam.HasScores)
 			{
@@ -483,7 +493,96 @@ namespace Server
 				}
 
 				SendSplitTimer.Start();
+
+				StartTimeCallTimers(CurrentPlayingTeam);
 			}
+		}
+
+		void StopTimeCallTimers()
+		{
+			foreach (System.Timers.Timer timer in TimeCallTimers)
+			{
+				timer.Stop();
+			}
+
+			TimeCallTimers.Clear();
+		}
+
+		void StartTimeCallTimers(TeamData team)
+		{
+			StopTimeCallTimers();
+			float preTimeSeconds = 5f;
+			float routineLengthSeconds = RoutineLengthMinutes * 60f - preTimeSeconds;
+
+			if (team.TimeCall10sEnabled && routineLengthSeconds > 10f)
+			{
+				System.Timers.Timer newTimer = new System.Timers.Timer();
+				newTimer.Interval = (routineLengthSeconds - 10f) * 1000f;
+				newTimer.Elapsed += (sender, e) => { SpeakTimeCall(ETimeCall.TimeCall10s); };
+				TimeCallTimers.Add(newTimer);
+			}
+			if (team.TimeCall15sEnabled && routineLengthSeconds > 15f)
+			{
+				System.Timers.Timer newTimer = new System.Timers.Timer();
+				newTimer.Interval = (routineLengthSeconds - 15f) * 1000f;
+				newTimer.Elapsed += (sender, e) => { SpeakTimeCall(ETimeCall.TimeCall15s); };
+				TimeCallTimers.Add(newTimer);
+			}
+			if (team.TimeCall20sEnabled && routineLengthSeconds > 20f)
+			{
+				System.Timers.Timer newTimer = new System.Timers.Timer();
+				newTimer.Interval = (routineLengthSeconds - 20f) * 1000f;
+				newTimer.Elapsed += (sender, e) => { SpeakTimeCall(ETimeCall.TimeCall20s); };
+				TimeCallTimers.Add(newTimer);
+			}
+			if (team.TimeCall30sEnabled && routineLengthSeconds > 30f)
+			{
+				System.Timers.Timer newTimer = new System.Timers.Timer();
+				newTimer.Interval = (routineLengthSeconds - 30f) * 1000f;
+				newTimer.Elapsed += (sender, e) => { SpeakTimeCall(ETimeCall.TimeCall30s); };
+				TimeCallTimers.Add(newTimer);
+			}
+			if (team.TimeCall1mEnabled && routineLengthSeconds > 60f)
+			{
+				System.Timers.Timer newTimer = new System.Timers.Timer();
+				newTimer.Interval = (routineLengthSeconds - 60f) * 1000f;
+				newTimer.Elapsed += (sender, e) => { SpeakTimeCall(ETimeCall.TimeCall1m); };
+				TimeCallTimers.Add(newTimer);
+			}
+
+			foreach (System.Timers.Timer timer in TimeCallTimers)
+			{
+				timer.AutoReset = false;
+				timer.Start();
+			}
+		}
+
+		void SpeakTimeCall(ETimeCall timeCall)
+		{
+			string message = GetTimeCallMessage(timeCall);
+
+			Speech.SpeakAsync(message);
+		}
+
+		string GetTimeCallMessage(ETimeCall timeCall)
+		{
+			string attensionString = "Attention, Time call for ";
+
+			switch (timeCall)
+			{
+				case ETimeCall.TimeCall10s:
+					return attensionString + "10 seconds in 3, 2, 1";
+				case ETimeCall.TimeCall15s:
+					return attensionString + "15 seconds in 3, 2, 1";
+				case ETimeCall.TimeCall20s:
+					return attensionString + "20 seconds in 3, 2, 1";
+				case ETimeCall.TimeCall30s:
+					return attensionString + "30 seconds in 3, 2, 1";
+				case ETimeCall.TimeCall1m:
+					return attensionString + "1 minute in 3, 2, 1";
+			}
+
+			return "";
 		}
 
 		void CancelRoutine()
@@ -498,6 +597,8 @@ namespace Server
 			}
 
 			SendSplitTimer.Stop();
+
+			StopTimeCallTimers();
 		}
 
 		void UpdateJudgesForClients()
@@ -880,9 +981,33 @@ namespace Server
 
 		// Display
 		public string ClientName { get { return ClientId == null ? "None" : ClientId.DisplayName; } }
-		public string JudgeValue { get { return LastJudgeValue.ToString("0.0"); } }
-		public string JudgeName { get { return Judge == null ? "None" : Judge.JudgeName; } }
+		public string JudgeValue
+		{
+			get
+			{
+				return IsScoreboard ? "" : LastJudgeValue.ToString("0.0");
+			}
+		}
+		public string JudgeName
+		{
+			get
+			{
+				if (IsScoreboard)
+				{
+					return "Scoreboard";
+				}
+				else  if (Judge == null)
+				{
+					return "None";
+				}
+				else
+				{
+					return Judge.JudgeName;
+				}
+			}
+		}
 		public string JudgeCategory { get { return Judge == null ? "None" : Judge.Category.ToString(); } }
+		public bool IsScoreboard { get { return ClientId != null && ClientId.ClientType == EClientType.Scoreboard; } }
 
 		public event PropertyChangedEventHandler PropertyChanged;
 		private void NotifyPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] String propertyName = "")
@@ -1104,6 +1229,57 @@ namespace Server
 			}
 		}
 		public bool HasScores { get { return TotalScore > 0; } }
+		bool[] timeCallEnables = { false, false, false, false, false };
+		public bool TimeCall10sEnabled
+		{
+			get { return timeCallEnables[(int)ETimeCall.TimeCall10s]; }
+			set
+			{
+				timeCallEnables[(int)ETimeCall.TimeCall10s] = value;
+
+				NotifyPropertyChanged("TimeCall10sEnabled");
+			}
+		}
+		public bool TimeCall15sEnabled
+		{
+			get { return timeCallEnables[(int)ETimeCall.TimeCall15s]; }
+			set
+			{
+				timeCallEnables[(int)ETimeCall.TimeCall15s] = value;
+
+				NotifyPropertyChanged("TimeCall15sEnabled");
+			}
+		}
+		public bool TimeCall20sEnabled
+		{
+			get { return timeCallEnables[(int)ETimeCall.TimeCall20s]; }
+			set
+			{
+				timeCallEnables[(int)ETimeCall.TimeCall20s] = value;
+
+				NotifyPropertyChanged("TimeCall20sEnabled");
+			}
+		}
+		public bool TimeCall30sEnabled
+		{
+			get { return timeCallEnables[(int)ETimeCall.TimeCall30s]; }
+			set
+			{
+				timeCallEnables[(int)ETimeCall.TimeCall30s] = value;
+
+				NotifyPropertyChanged("TimeCall30sEnabled");
+			}
+		}
+		public bool TimeCall1mEnabled
+		{
+			get { return timeCallEnables[(int)ETimeCall.TimeCall1m]; }
+			set
+			{
+				timeCallEnables[(int)ETimeCall.TimeCall1m] = value;
+
+				NotifyPropertyChanged("TimeCall1mEnabled");
+			}
+		}
 
 		void UpdateAfterScoreUpdate()
 		{
@@ -1157,5 +1333,14 @@ namespace Server
 			ImportedJudges.Clear();
 			RoutineLengthMinutes = 3f;
 		}
+	}
+
+	public enum ETimeCall
+	{
+		TimeCall10s,
+		TimeCall15s,
+		TimeCall20s,
+		TimeCall30s,
+		TimeCall1m
 	}
 }
