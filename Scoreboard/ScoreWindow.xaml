@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Scoreboard"
         mc:Ignorable="d"
-        Title="MainWindow"
+        Title="Scoreboard"
         Height="720" Width="1280"
         Loaded="Window_Loaded"
         MouseDoubleClick="Window_MouseDoubleClick"

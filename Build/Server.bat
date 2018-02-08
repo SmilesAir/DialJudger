@@ -1,0 +1,1 @@
+start "" "Server\Server.exe"

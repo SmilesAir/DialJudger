@@ -114,6 +114,18 @@ namespace Server
 		{
 			get { return RoutineTimer.IsRoutinePlaying; }
 		}
+		public bool CurrentPlayingTeamHasResults
+		{
+			get
+			{
+				if (CurrentPlayingTeam != null)
+				{
+					return CurrentPlayingTeam.HasScores;
+				}
+
+				return false;
+			}
+		}
 		public string StartButtonText
 		{
 			get
@@ -125,6 +137,10 @@ namespace Server
 				else if (IsJudging)
 				{
 					return "Triple Click To Stop Routine";
+				}
+				else if (CurrentPlayingTeamHasResults)
+				{
+					return "Click to Set Next Team";
 				}
 				else
 				{
@@ -272,9 +288,9 @@ namespace Server
 		{
 			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
 			{
-				ServerWindow.SetTeamScore(ServerWindow.CurrentPlayingTeam, score);
+				ServerWindow.SetTeamScore(score);
 
-				ServerWindow.TryIncrementPlayingTeam();
+				ServerWindow.NotifyPropertyChanged("StartButtonText");
 			}));
 		}
 
@@ -412,7 +428,7 @@ namespace Server
 			}
 
 			bool bCancel = false;
-			if (playingTeam.HasScores)
+			if (playingTeam != null && playingTeam.HasScores)
 			{
 				if (MessageBox.Show("This team has scores! Do you want to overwrite scores for:\r\n" + playingTeam.PlayerNamesString + "?", "Attention!",
 				MessageBoxButton.OKCancel) == MessageBoxResult.OK)
@@ -455,7 +471,11 @@ namespace Server
 
 			if (!IsJudging)
 			{
-				if (secondsSinceCancelClick > StartAfterCancelTimeLimit)
+				if (CurrentPlayingTeamHasResults)
+				{
+					ServerWindow.TryIncrementPlayingTeam();
+				}
+				else if (secondsSinceCancelClick > StartAfterCancelTimeLimit)
 				{
 					StartRoutine();
 				}
@@ -861,6 +881,7 @@ namespace Server
 			SendSplitTimer.Stop();
 
 			NotifyPropertyChanged("TimeRemainingString");
+			NotifyPropertyChanged("StartButtonText");
 		}
 
 		public void OnUpdateRoutineTimer()

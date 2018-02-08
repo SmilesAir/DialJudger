@@ -1,0 +1,1 @@
+start "" "Scoreboard\Scoreboard.exe"
