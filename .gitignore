@@ -26,3 +26,8 @@ _ReSharper*/
 .vs/
 #Nuget packages folder
 packages/
+DialJudgeBins
+DialJudgeBins.zip
+DialJudgerServerSave.txt
+DialJudgerClientBackups
+PacketHandlerError*
