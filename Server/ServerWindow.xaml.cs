@@ -62,6 +62,7 @@ namespace Server
 
 				NotifyPropertyChanged("NowPlayingString");
 				NotifyPropertyChanged("StartButtonText");
+				NotifyPropertyChanged("StartButtonTextColor");
 			}
 		}
 		RoutineTimers RoutineTimer = new RoutineTimers(() => ServerWindow.OnFinishRoutineTimer(), () => ServerWindow.OnUpdateRoutineTimer());
@@ -145,6 +146,28 @@ namespace Server
 				else
 				{
 					return "Click on First Throw";
+				}
+			}
+		}
+		public Brush StartButtonTextColor
+		{
+			get
+			{
+				if (CurrentPlayingTeam == null)
+				{
+					return Brushes.Crimson;
+				}
+				else if (IsJudging)
+				{
+					return Brushes.DarkOrange;
+				}
+				else if (CurrentPlayingTeamHasResults)
+				{
+					return Brushes.DarkOrange;
+				}
+				else
+				{
+					return Brushes.DarkSeaGreen;
 				}
 			}
 		}
@@ -238,7 +261,7 @@ namespace Server
 
 			foreach (ClientData cd in Clients.Clients)
 			{
-				if (cd.ClientId.ClientType == EClientType.Scoreboard)
+				if (IsExternalDisplay(cd))
 				{
 					cd.ConnectionData.SendObject("ServerSendSplit", totalPoints);
 				}
@@ -264,14 +287,14 @@ namespace Server
 
 		private static void HandleClientConnect(PacketHeader header, Connection connection, ClientIdData clientInfo)
 		{
-			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
+			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(() =>
 			{
 				Clients.Add(connection, clientInfo, () => ServerWindow.UpdateJudgesForClients());
 
-				if (clientInfo.ClientType == EClientType.Scoreboard)
+				if (ServerWindow.IsExternalDisplay(clientInfo))
 				{
 					// Init the new scorboard
-					ServerWindow.SendUpdatesToScoreboard();
+					ServerWindow.SendUpdatesToExternalDisplay();
 				}
 			}));
 		}
@@ -291,6 +314,7 @@ namespace Server
 				ServerWindow.SetTeamScore(score);
 
 				ServerWindow.NotifyPropertyChanged("StartButtonText");
+				ServerWindow.NotifyPropertyChanged("StartButtonTextColor");
 			}));
 		}
 
@@ -321,13 +345,13 @@ namespace Server
 
 				UpdateResultsText();
 
-				SendUpdatesToScoreboard();
+				SendUpdatesToExternalDisplay();
 
 				Save();
 			}
 		}
 
-		void SendResultsToScoreboard()
+		void SendResultsToExtenalDisplay()
 		{
 			List<TeamData> sortedTeams = CalcSortedTeams();
 			ScoreboardResultsData results = new ScoreboardResultsData();
@@ -348,14 +372,14 @@ namespace Server
 
 			foreach (ClientData cd in Clients.Clients)
 			{
-				if (cd.ClientId.ClientType == EClientType.Scoreboard)
+				if (IsExternalDisplay(cd))
 				{
 					cd.ConnectionData.SendObject("ServerSendResults", results);
 				}
 			}
 		}
 
-		void SendUpNextTeamsToScoreboard()
+		void SendUpNextTeamsToExternalDisplay()
 		{
 			List<TeamData> upNextTeams = new List<TeamData>();
 			foreach (TeamData team in SaveDataInst.TeamList)
@@ -374,17 +398,27 @@ namespace Server
 
 			foreach (ClientData cd in Clients.Clients)
 			{
-				if (cd.ClientId.ClientType == EClientType.Scoreboard)
+				if (IsExternalDisplay(cd))
 				{
 					cd.ConnectionData.SendObject("ServerSendUpNextTeams", upNextData);
 				}
 			}
 		}
 
-		void SendUpdatesToScoreboard()
+		void SendUpdatesToExternalDisplay()
 		{
-			SendResultsToScoreboard();
-			SendUpNextTeamsToScoreboard();
+			SendResultsToExtenalDisplay();
+			SendUpNextTeamsToExternalDisplay();
+		}
+
+		bool IsExternalDisplay(ClientData cd)
+		{
+			return IsExternalDisplay(cd.ClientId);
+		}
+
+		bool IsExternalDisplay(ClientIdData clientId)
+		{
+			return clientId.ClientType == EClientType.Scoreboard || clientId.ClientType == EClientType.Overlay;
 		}
 
 		private static void OnConnectionEstablished(Connection connection)
@@ -456,7 +490,7 @@ namespace Server
 					connection.SendObject("ServerSetPlayingTeam", routineData);
 				}
 
-				SendUpdatesToScoreboard();
+				SendUpdatesToExternalDisplay();
 			}
 		}
 
@@ -504,6 +538,7 @@ namespace Server
 				RoutineTimer.StartRoutine(RoutineLengthMinutes);
 
 				NotifyPropertyChanged("StartButtonText");
+				NotifyPropertyChanged("StartButtonTextColor");
 
 				InitRoutineData routineData = new InitRoutineData(CurrentPlayingTeam.PlayerNamesString, RoutineLengthMinutes);
 
@@ -610,6 +645,7 @@ namespace Server
 			RoutineTimer.StopRoutine();
 
 			NotifyPropertyChanged("StartButtonText");
+			NotifyPropertyChanged("StartButtonTextColor");
 
 			foreach (Connection connection in NetworkComms.GetExistingConnection())
 			{
@@ -737,7 +773,7 @@ namespace Server
 			}
 
 			Save();
-			SendUpdatesToScoreboard();
+			SendUpdatesToExternalDisplay();
 			UpdateResultsText();
 		}
 
@@ -882,6 +918,7 @@ namespace Server
 
 			NotifyPropertyChanged("TimeRemainingString");
 			NotifyPropertyChanged("StartButtonText");
+			NotifyPropertyChanged("StartButtonTextColor");
 		}
 
 		public void OnUpdateRoutineTimer()
@@ -904,7 +941,7 @@ namespace Server
 		{
 			team.ClearScores(SaveDataInst.TeamList);
 
-			SendUpdatesToScoreboard();
+			SendUpdatesToExternalDisplay();
 
 			UpdateResultsText();
 		}
@@ -938,7 +975,7 @@ namespace Server
 		{
 			UpdateTeamsRank();
 
-			SendUpdatesToScoreboard();
+			SendUpdatesToExternalDisplay();
 
 			UpdateResultsText();
 
@@ -1006,7 +1043,7 @@ namespace Server
 		{
 			get
 			{
-				return IsScoreboard ? "" : LastJudgeValue.ToString("0.0");
+				return (IsScoreboard || IsOverlay) ? "" : LastJudgeValue.ToString("0.0");
 			}
 		}
 		public string JudgeName
@@ -1017,7 +1054,11 @@ namespace Server
 				{
 					return "Scoreboard";
 				}
-				else  if (Judge == null)
+				else if (IsOverlay)
+				{
+					return "Overlay";
+				}
+				else if (Judge == null)
 				{
 					return "None";
 				}
@@ -1029,6 +1070,7 @@ namespace Server
 		}
 		public string JudgeCategory { get { return Judge == null ? "None" : Judge.Category.ToString(); } }
 		public bool IsScoreboard { get { return ClientId != null && ClientId.ClientType == EClientType.Scoreboard; } }
+		public bool IsOverlay { get { return ClientId != null && ClientId.ClientType == EClientType.Overlay; } }
 
 		public event PropertyChangedEventHandler PropertyChanged;
 		private void NotifyPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] String propertyName = "")

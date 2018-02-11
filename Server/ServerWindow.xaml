@@ -205,7 +205,13 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Button Content="{Binding StartButtonText}" Click="StartButton_Click"/>
+            <Button Click="StartButton_Click">
+                <Grid Margin="30">
+                    <Viewbox>
+                        <Label Content="{Binding StartButtonText}" Foreground="{Binding StartButtonTextColor}"/>
+                    </Viewbox>
+                </Grid>
+            </Button>
 
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>

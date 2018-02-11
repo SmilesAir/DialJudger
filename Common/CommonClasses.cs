@@ -9,6 +9,7 @@ using System.Net;
 using System.Timers;
 using NetworkCommsDotNet.Connections.UDP;
 using NetworkCommsDotNet;
+using System.ComponentModel;
 
 namespace CommonClasses
 {
@@ -475,6 +476,85 @@ namespace CommonClasses
 		private void OnConnectionClosed(Connection connection)
 		{
 			IsConnected = false;
+		}
+	}
+
+	public class TeamResultsData : INotifyPropertyChanged
+	{
+		public event PropertyChangedEventHandler PropertyChanged;
+		private void NotifyPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] String propertyName = "")
+		{
+			if (PropertyChanged != null)
+			{
+				PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+			}
+		}
+		int rank = 0;
+		public int Rank
+		{
+			get { return rank; }
+			set
+			{
+				rank = value;
+				NotifyPropertyChanged("Rank");
+				NotifyPropertyChanged("RankString");
+			}
+		}
+		public string RankString
+		{
+			get { return Rank.ToString() + "."; }
+		}
+		string playerNames = "";
+		public string PlayerNames
+		{
+			get { return playerNames; }
+			set
+			{
+				playerNames = value;
+
+				NotifyPropertyChanged("PlayerNames");
+			}
+		}
+		float totalPoints = 0f;
+		public float TotalPoints
+		{
+			get { return totalPoints; }
+			set
+			{
+				totalPoints = value;
+
+				NotifyPropertyChanged("TotalPoints");
+			}
+		}
+		public string TotalPointsString
+		{
+			get { return "Points: " + TotalPoints.ToString("0.0"); }
+		}
+		float deltaPoints = 0f;
+		public float DeltaPoints
+		{
+			get { return deltaPoints; }
+			set
+			{
+				deltaPoints = value;
+
+				NotifyPropertyChanged("DeltaPoints");
+			}
+		}
+		public string DeltaPointsString
+		{
+			get { return (DeltaPoints == 0f ? "" : "Delta: " + DeltaPoints.ToString("0.0")); }
+		}
+
+		public TeamResultsData()
+		{
+		}
+
+		public TeamResultsData(ScoreboardTeamResultData teamResult)
+		{
+			Rank = teamResult.Rank;
+			PlayerNames = teamResult.PlayerNames;
+			TotalPoints = teamResult.TotalPoints;
 		}
 	}
 }

@@ -1,0 +1,59 @@
+﻿<Window x:Class="Overlay.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Overlay"
+        mc:Ignorable="d"
+        Title="Overlay" Height="720" Width="1280"
+        Loaded="Window_Loaded">
+    <Grid Name="TopLevelGrid" Background="LightGreen">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="{Binding LowerDisplayHeight}"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="1" Background="OldLace" BorderBrush="DarkGray" BorderThickness="1" CornerRadius="10">
+            <Grid>
+                <Viewbox>
+                    <Label Content="{Binding LowerDisplayText}" Opacity="{Binding LowerDisplayTextAlpha}"/>
+                </Viewbox>
+            </Grid>
+        </Border>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="170"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="10"/>
+                <RowDefinition Height="{Binding HudHeight}"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="1" Grid.Column="1" Background="OldLace" BorderBrush="DarkGray" BorderThickness="1" CornerRadius="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Label Content="Time:" FontSize="20" Margin="0, -5, 0, -5" Opacity="{Binding HudTextAlpha}"/>
+                    <Label Grid.Row="1" Content="Current:" FontSize="20" Margin="0, -5, 0, -5" Opacity="{Binding HudTextAlpha}"/>
+                    <Label Grid.Row="2" Content="Split:" FontSize="20" Margin="0, -5, 0, 0" Opacity="{Binding HudTextAlpha}"/>
+
+                    <Label Grid.Column="1" Content="{Binding RoutineTimeString}" FontSize="20" Margin="0, -5, 0, -5" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Opacity="{Binding HudTextAlpha}"/>
+                    <Label Grid.Row="1" Grid.Column="1" Content="{Binding SplitPointsString}" FontSize="20" Margin="0, -5, 0, -5" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Opacity="{Binding HudTextAlpha}"/>
+                    <Label Grid.Row="2" Grid.Column="1" Content="{Binding SplitDeltaPointsString}" FontSize="20" Margin="0, -5, 0, 0" Foreground="{Binding SplitDeltaStringColor}" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Opacity="{Binding HudTextAlpha}"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
