@@ -750,26 +750,49 @@ namespace Server
 
 		void ImportTeamsFromTextbox()
 		{
-			// Check if we are overriding data
+			if (SaveDataInst.TeamList.Count > 0)
+			{
+				if (MessageBox.Show("Overwrite Current Data?", "Attention!", MessageBoxButton.YesNoCancel) != MessageBoxResult.Yes)
+				{
+					return;
+				}
+			}
 
+			ImportTeamsFromText(TeamsTextBox.Text);
+		}
+
+		private void ImportTeamsFromText(string inText)
+		{
 			string[] splitters = { ",", "-", "/", "|" };
-			StringReader text = new StringReader(TeamsTextBox.Text);
+			StringReader text = new StringReader(inText);
 
 			SaveDataInst.TeamList.Clear();
 
 			string line = null;
 			while ((line = text.ReadLine()) != null)
 			{
-				TeamData newTeam = new TeamData();
-				newTeam.UpdateAllTeamScores = OnTeamScoreUpdate;
-
-				string[] names = line.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
-				foreach (string name in names)
+				if (line.Contains("Judges"))
 				{
-					newTeam.PlayerNames.Add(name.Trim());
+					ImportJudgesFromText(text.ReadToEnd());
+					break;
 				}
+				else if (line.StartsWith("//") || line.Trim().Length == 0)
+				{
+					continue;
+				}
+				else
+				{
+					TeamData newTeam = new TeamData();
+					newTeam.UpdateAllTeamScores = OnTeamScoreUpdate;
 
-				SaveDataInst.TeamList.Add(newTeam);
+					string[] names = line.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
+					foreach (string name in names)
+					{
+						newTeam.PlayerNames.Add(name.Trim());
+					}
+
+					SaveDataInst.TeamList.Add(newTeam);
+				}
 			}
 
 			Save();
@@ -789,7 +812,6 @@ namespace Server
 
 		void ImportJudgesFromTextbox()
 		{
-			// Check if we are overriding data
 			if (SaveDataInst.ImportedJudges.Count > 0)
 			{
 				if (MessageBox.Show("Overriding old Judges! Continue?", "Attention!",
@@ -799,37 +821,49 @@ namespace Server
 				}
 			}
 
+			ImportJudgesFromText(JudgesTextBox.Text);
+		}
+
+		void ImportJudgesFromText(string inText)
+		{
 			SaveDataInst.ImportedJudges.Clear();
 
 			string[] splitters = { ",", "-", "/", "|" };
-			StringReader text = new StringReader(JudgesTextBox.Text);
+			StringReader text = new StringReader(inText);
 
 			bool bImportError = false;
 			string line = null;
 			while ((line = text.ReadLine()) != null)
 			{
-				string[] judgeParams = line.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
-				if (judgeParams.Length == 2)
+				if (line.StartsWith("//") || line.Trim().Length == 0)
 				{
-					ECategory judgeCategory;
-					if (Enum.TryParse<ECategory>(judgeParams[1].Trim(), out judgeCategory))
+					continue;
+				}
+				else
+				{
+					string[] judgeParams = line.Split(splitters, StringSplitOptions.RemoveEmptyEntries);
+					if (judgeParams.Length == 2)
 					{
-						SaveDataInst.ImportedJudges.Add(new JudgeData(judgeParams[0].Trim(), judgeCategory));
+						ECategory judgeCategory;
+						if (Enum.TryParse<ECategory>(judgeParams[1].Trim(), out judgeCategory))
+						{
+							SaveDataInst.ImportedJudges.Add(new JudgeData(judgeParams[0].Trim(), judgeCategory));
+						}
+						else
+						{
+							// Parse Error
+							bImportError = true;
+
+							MessageBox.Show("Failed to import line (Unknown category):\r\n" + line, "Attention!");
+						}
 					}
 					else
 					{
 						// Parse Error
 						bImportError = true;
 
-						MessageBox.Show("Failed to import line (Unknown category):\r\n" + line, "Attention!");
+						MessageBox.Show("Failed to import line (Incorrect comma usage):\r\n" + line, "Attention!");
 					}
-				}
-				else
-				{
-					// Parse Error
-					bImportError = true;
-
-					MessageBox.Show("Failed to import line (Incorrect comma usage):\r\n" + line, "Attention!");
 				}
 			}
 
@@ -994,6 +1028,35 @@ namespace Server
 				SaveFilename = ofd.FileName;
 
 				Load();
+			}
+		}
+
+		private void Import_Click(object sender, RoutedEventArgs e)
+		{
+			Microsoft.Win32.OpenFileDialog ofd = new Microsoft.Win32.OpenFileDialog();
+			ofd.DefaultExt = ".txt";
+			ofd.Filter = "Text Files (*.txt)|*.txt";
+			ofd.Multiselect = false;
+
+			if (ofd.ShowDialog() == true)
+			{
+
+				if (SaveDataInst.TeamList.Count > 0)
+				{
+					if (MessageBox.Show("Overwrite Current Data?", "Attention!", MessageBoxButton.YesNoCancel) == MessageBoxResult.Yes)
+					{
+						try
+						{
+							using (StreamReader file = new StreamReader(ofd.FileName))
+							{
+								ImportTeamsFromText(file.ReadToEnd());
+							}
+						}
+						catch
+						{
+						}
+					}
+				}
 			}
 		}
 	}

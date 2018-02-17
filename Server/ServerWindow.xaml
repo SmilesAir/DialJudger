@@ -63,6 +63,7 @@
 
         <Menu>
             <MenuItem Header="_File">
+                <MenuItem Header="_Import" Click="Import_Click"/>
                 <MenuItem Header="_Open" Click="Open_Click"/>
                 <MenuItem Header="_Save" Click="SaveButton_Click"/>
                 <MenuItem Header="S_ave As"/>

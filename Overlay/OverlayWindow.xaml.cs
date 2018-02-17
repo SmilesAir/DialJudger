@@ -170,6 +170,7 @@ namespace Overlay
 			get { return ResultsList.Count > 0 ? ResultsList.First().TotalPoints : 0f; }
 		}
 		public ObservableCollection<TeamResultsData> ResultsList = new ObservableCollection<TeamResultsData>();
+		public ObservableCollection<UpNextData> UpNextList = new ObservableCollection<UpNextData>();
 		public bool CurrentTeamHasResults
 		{
 			get
@@ -343,6 +344,19 @@ namespace Overlay
 		{
 			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
 			{
+				UpNextList.Clear();
+
+				int i = 1;
+				foreach (ScoreboardUpNextTeamData team in upNextData.UpNextTeams)
+				{
+					UpNextData upNextTeam = new UpNextData(team);
+					upNextTeam.OnDeckNumber = i;
+					upNextTeam.EtaMinutesToPlay = (int)(i * RoutineLengthMinutes + i * CommonValues.BetweenTeamBufferMinutes);
+
+					UpNextList.Add(upNextTeam);
+
+					++i;
+				}
 			}));
 		}
 

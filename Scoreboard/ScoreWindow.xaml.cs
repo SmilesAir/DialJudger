@@ -55,7 +55,7 @@ namespace Scoreboard
 		RoutineTimers RoutineTimer;
 		public double TeamDisplayHeight
 		{
-			get { return ActualHeight / 14f; }
+			get { return ActualHeight / 16f; }
 		}
 		public double PointsDeltaWidth
 		{
@@ -72,7 +72,6 @@ namespace Scoreboard
 				NotifyPropertyChanged("RoutineLengthMinutes");
 			}
 		}
-		public float BetweenTeamBufferMinutes = 1f;
 		float splitPoints = 0f;
 		public float SplitPoints
 		{
@@ -189,7 +188,7 @@ namespace Scoreboard
 				{
 					UpNextData upNextTeam = new UpNextData(team);
 					upNextTeam.OnDeckNumber = i;
-					upNextTeam.EtaMinutesToPlay = (int)(i * RoutineLengthMinutes + i * BetweenTeamBufferMinutes);
+					upNextTeam.EtaMinutesToPlay = (int)(i * RoutineLengthMinutes + i * CommonValues.BetweenTeamBufferMinutes);
 
 					UpNextList.Add(upNextTeam);
 
@@ -233,71 +232,6 @@ namespace Scoreboard
 			{
 				this.WindowStyle = WindowStyle.SingleBorderWindow;
 			}
-		}
-	}
-
-	public class UpNextData : INotifyPropertyChanged
-	{
-		public event PropertyChangedEventHandler PropertyChanged;
-		private void NotifyPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] String propertyName = "")
-		{
-			if (PropertyChanged != null)
-			{
-				PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
-			}
-		}
-
-		string playerNames = "";
-		public string PlayerNames
-		{
-			get { return playerNames; }
-			set
-			{
-				playerNames = value;
-
-				NotifyPropertyChanged("PlayerNames");
-			}
-		}
-		int onDeckNumber = 1;
-		public int OnDeckNumber
-		{
-			get { return onDeckNumber; }
-			set
-			{
-				onDeckNumber = value;
-
-				NotifyPropertyChanged("OnDeckNumber");
-				NotifyPropertyChanged("OnDeckNumberString");
-			}
-		}
-		public string OnDeckNumberString
-		{
-			get { return OnDeckNumber.ToString() + "."; }
-		}
-		int etaMinutesToPlay = 0;
-		public int EtaMinutesToPlay
-		{
-			get { return etaMinutesToPlay; }
-			set
-			{
-				etaMinutesToPlay = value;
-
-				NotifyPropertyChanged("EtaMinutesToPlay");
-				NotifyPropertyChanged("EstimatedTimeToPlayString");
-			}
-		}
-		public string EstimatedTimeToPlayString
-		{
-			get { return "ETA: " + EtaMinutesToPlay + " Minutes"; }
-		}
-
-		public UpNextData()
-		{
-		}
-
-		public UpNextData(ScoreboardUpNextTeamData team)
-		{
-			PlayerNames = team.PlayerNames;
 		}
 	}
 }
