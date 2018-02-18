@@ -6,17 +6,32 @@
         xmlns:local="clr-namespace:Overlay"
         mc:Ignorable="d"
         Title="Overlay" Height="720" Width="1280"
-        Loaded="Window_Loaded">
+        Loaded="Window_Loaded"
+        SizeChanged="Window_SizeChanged"
+        KeyDown="Window_KeyDown">
     <Grid Name="TopLevelGrid" Background="LightGreen">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="{Binding LowerDisplayHeight}"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="1" Background="OldLace" BorderBrush="DarkGray" BorderThickness="1" CornerRadius="10">
+        <Border Grid.Row="1" Background="{Binding BackgroundColor}" BorderBrush="DarkGray" BorderThickness="1" CornerRadius="10">
             <Grid>
-                <Viewbox>
-                    <Label Content="{Binding LowerDisplayText}" Opacity="{Binding LowerDisplayTextAlpha}"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Viewbox Margin="10">
+                    <Image Opacity="{Binding LowerDisplayTextOpacity}">
+                        <Image.Source>
+                            <BitmapImage UriSource="/Art/SquareLogo.png"/>
+                        </Image.Source>
+                    </Image>
+                </Viewbox>
+                
+                <Viewbox Grid.Column="1">
+                    <Label Content="{Binding LowerDisplayText}" Opacity="{Binding LowerDisplayTextOpacity}"/>
                 </Viewbox>
             </Grid>
         </Border>
@@ -33,7 +48,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="1" Grid.Column="1" Background="OldLace" BorderBrush="DarkGray" BorderThickness="1" CornerRadius="10">
+            <Border Grid.Row="1" Grid.Column="1" Background="{Binding BackgroundColor}" BorderBrush="DarkGray" BorderThickness="1" CornerRadius="10">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -45,15 +60,61 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Label Content="Time:" FontSize="20" Margin="0, -5, 0, -5" Opacity="{Binding HudTextAlpha}"/>
-                    <Label Grid.Row="1" Content="Current:" FontSize="20" Margin="0, -5, 0, -5" Opacity="{Binding HudTextAlpha}"/>
-                    <Label Grid.Row="2" Content="Split:" FontSize="20" Margin="0, -5, 0, 0" Opacity="{Binding HudTextAlpha}"/>
+                    <Label Content="Time:" FontSize="20" Margin="0, -5, 0, -5" Opacity="{Binding HudTextOpacity}"/>
+                    <Label Grid.Row="1" Content="Current:" FontSize="20" Margin="0, -5, 0, -5" Opacity="{Binding HudTextOpacity}"/>
+                    <Label Grid.Row="2" Content="Split:" FontSize="20" Margin="0, -5, 0, 0" Opacity="{Binding HudTextOpacity}"/>
 
-                    <Label Grid.Column="1" Content="{Binding RoutineTimeString}" FontSize="20" Margin="0, -5, 0, -5" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Opacity="{Binding HudTextAlpha}"/>
-                    <Label Grid.Row="1" Grid.Column="1" Content="{Binding SplitPointsString}" FontSize="20" Margin="0, -5, 0, -5" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Opacity="{Binding HudTextAlpha}"/>
-                    <Label Grid.Row="2" Grid.Column="1" Content="{Binding SplitDeltaPointsString}" FontSize="20" Margin="0, -5, 0, 0" Foreground="{Binding SplitDeltaStringColor}" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Opacity="{Binding HudTextAlpha}"/>
+                    <Label Grid.Column="1" Content="{Binding RoutineTimeString}" FontSize="20" Margin="0, -5, 0, -5" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Opacity="{Binding HudTextOpacity}"/>
+                    <Label Grid.Row="1" Grid.Column="1" Content="{Binding SplitPointsString}" FontSize="20" Margin="0, -5, 0, -5" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Opacity="{Binding HudTextOpacity}"/>
+                    <Label Grid.Row="2" Grid.Column="1" Content="{Binding SplitDeltaPointsString}" FontSize="20" Margin="0, -5, 0, 0" Foreground="{Binding SplitDeltaStringColor}" HorizontalContentAlignment="Right" HorizontalAlignment="Right" Opacity="{Binding HudTextOpacity}"/>
                 </Grid>
             </Border>
         </Grid>
+
+        <Border Height="{Binding ScoreboardHeight}" Grid.RowSpan="2"  Background="{Binding BackgroundColor}" BorderBrush="DarkGray" BorderThickness="1" CornerRadius="10" VerticalAlignment="Center" Margin="50, 0, 50, 0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="10*"/>
+                </Grid.RowDefinitions>
+
+                <Viewbox>
+                    <Label Content="Frisbeer 2018" Opacity="{Binding ScoreboardTextOpacity}"/>
+                </Viewbox>
+
+                <ItemsControl Grid.Row="1" Name="OutputRows" Tag="{Binding .}" HorizontalContentAlignment="Stretch">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Border>
+                                    <Grid Background="{Binding BgColor}" Height="{Binding Tag.TeamDisplayHeight, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="3*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="{Binding Tag.PointsDeltaWidth, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Viewbox Grid.ColumnSpan="{Binding String1ColumnSpan}">
+                                            <Label Content="{Binding String1}" Opacity="{Binding Tag.ScoreboardTextOpacity, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}"/>
+                                        </Viewbox>
+                                        <Viewbox Grid.Column="1" HorizontalAlignment="Left">
+                                            <Label Content="{Binding String2}" Opacity="{Binding Tag.ScoreboardTextOpacity, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}"/>
+                                        </Viewbox>
+                                        <Viewbox Grid.Column="3" HorizontalAlignment="Right">
+                                            <Label Content="{Binding String3}" Opacity="{Binding Tag.ScoreboardTextOpacity, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}"/>
+                                        </Viewbox>
+                                        <Viewbox Grid.Column="4" HorizontalAlignment="Right">
+                                            <Label Content="{Binding String4}" Opacity="{Binding Tag.ScoreboardTextOpacity, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}"/>
+                                        </Viewbox>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

@@ -31,7 +31,12 @@
                 </Grid.ColumnDefinitions>
                 
                 <Viewbox Grid.ColumnSpan="2">
-                    <Label Content="{Binding TournamentTitle}"/>
+                    <!--<Label Content="{Binding TournamentTitle}"/>-->
+                    <Image>
+                        <Image.Source>
+                            <BitmapImage UriSource="/Art/frisbeer_neg.png"/>
+                        </Image.Source>
+                    </Image>
                 </Viewbox>
 
                 <Viewbox Grid.Column="1">

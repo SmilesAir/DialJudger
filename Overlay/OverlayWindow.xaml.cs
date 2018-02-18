@@ -34,12 +34,14 @@ namespace Overlay
 				PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
 			}
 		}
-		System.Timers.Timer LowerDisplayTransitionTimer = new System.Timers.Timer();
-		System.Timers.Timer HudTransitionTimer = new System.Timers.Timer();
 		System.Timers.Timer PostStartFadeOutTimer = new System.Timers.Timer();
 		System.Timers.Timer PostFinishFadeOutTimer = new System.Timers.Timer();
 		ClientConnection ClientConn = new ClientConnection((newClientId) => { });
 		RoutineTimers RoutineTimer;
+		ObservableCollection<OutputRow> DisplayRows = new ObservableCollection<OutputRow>();
+		TransitionInstance LowerDisplayTransition;
+		TransitionInstance HudTransition;
+		TransitionInstance ScoreboardTransition;
 
 		public string LowerDisplayText
 		{
@@ -66,14 +68,14 @@ namespace Overlay
 				NotifyPropertyChanged("LowerDisplayHeight");
 			}
 		}
-		double lowerDisplayTextAlpha = 0f;
-		public double LowerDisplayTextAlpha
+		double lowerDisplayTextOpacity = 0f;
+		public double LowerDisplayTextOpacity
 		{
-			get { return lowerDisplayTextAlpha; }
+			get { return lowerDisplayTextOpacity; }
 			set
 			{
-				lowerDisplayTextAlpha = value;
-				NotifyPropertyChanged("LowerDisplayTextAlpha");
+				lowerDisplayTextOpacity = value;
+				NotifyPropertyChanged("LowerDisplayTextOpacity");
 			}
 		}
 		double LowerDisplayInHeight
@@ -94,19 +96,58 @@ namespace Overlay
 				NotifyPropertyChanged("HudHeight");
 			}
 		}
-		double hudTextAlpha = 0f;
-		public double HudTextAlpha
+		double hudTextOpacity = 0f;
+		public double HudTextOpacity
 		{
-			get { return hudTextAlpha; }
+			get { return hudTextOpacity; }
 			set
 			{
-				hudTextAlpha = value;
-				NotifyPropertyChanged("HudTextAlpha");
+				hudTextOpacity = value;
+				NotifyPropertyChanged("HudTextOpacity");
 			}
 		}
 		double HudInHeight
 		{
 			get { return 88; }
+		}
+
+		double scoreboardTextOpacity = 0f;
+		public double ScoreboardTextOpacity
+		{
+			get { return scoreboardTextOpacity; }
+			set
+			{
+				scoreboardTextOpacity = value;
+				NotifyPropertyChanged("ScoreboardTextOpacity");
+			}
+		}
+		double scoreboardHeight = 0f;
+		public double ScoreboardHeight
+		{
+			get { return scoreboardHeight; }
+			set
+			{
+				scoreboardHeight = value;
+				NotifyPropertyChanged("ScoreboardHeight");
+			}
+		}
+		public double ScoreboardInHeight
+		{
+			get { return ActualHeight - 130; }
+		}
+
+		public double TeamDisplayHeight
+		{
+			get { return ActualHeight / 15f; }
+		}
+		public double PointsDeltaWidth
+		{
+			get { return ActualWidth / 6f; }
+		}
+
+		public Brush BackgroundColor
+		{
+			get { return Brushes.AntiqueWhite; }
 		}
 
 		float routineLengthMinutes = .1f;
@@ -217,24 +258,13 @@ namespace Overlay
 			}
 		}
 
-		double TransitionLength = 1f;
-		double LowerDisplayTransitionTime = 0f;
-		double LowerDisplayTargetHeight = 0f;
-		double LowerDisplayTargetAlpha = 0f;
-		double HudTransitionTime = 0f;
-		double HudTargetHeight = 0f;
-		double HudTargetAlpha = 0f;
-		double UpdateIntervalMS = 30;
-		DisplayState LowerDisplayState = DisplayState.Out;
-		DisplayState HudState = DisplayState.Out;
-
 		public MainWindow()
 		{
 			InitializeComponent();
 
 			RoutineTimer = new RoutineTimers(() =>
 			{
-				LowerDisplayTransitionIn();
+				LowerDisplayTransition.TransitionIn();
 				PostFinishFadeOutTimer.Start();
 			}, () =>
 			{
@@ -245,14 +275,7 @@ namespace Overlay
 		private void Window_Loaded(object sender, RoutedEventArgs e)
 		{
 			TopLevelGrid.DataContext = this;
-
-			LowerDisplayTransitionTimer.Interval = UpdateIntervalMS;
-			LowerDisplayTransitionTimer.Elapsed += LowerDisplayTransitionTimer_Elapsed;
-			LowerDisplayTransitionTimer.AutoReset = true;
-
-			HudTransitionTimer.Interval = UpdateIntervalMS;
-			HudTransitionTimer.Elapsed += HudTransitionTimer_Elapsed; ;
-			HudTransitionTimer.AutoReset = true;
+			OutputRows.ItemsSource = DisplayRows;
 
 			PostStartFadeOutTimer.Interval = 5000;
 			PostStartFadeOutTimer.Elapsed += PostStartFadeOutTimer_Elapsed;
@@ -265,17 +288,29 @@ namespace Overlay
 			AppendHandlers();
 
 			ClientConn.StartConnection(EClientType.Overlay);
+
+			LowerDisplayTransition = new TransitionInstance(
+				(x) => { LowerDisplayTextOpacity = x; },
+				(x) => { LowerDisplayHeight = x; },
+				LowerDisplayInHeight);
+			HudTransition = new TransitionInstance(
+				(x) => { HudTextOpacity = x; },
+				(x) => { HudHeight = x; },
+				HudInHeight);
+			ScoreboardTransition = new TransitionInstance(
+				(x) => { ScoreboardTextOpacity = x; },
+				(x) => { ScoreboardHeight = x; },
+				ScoreboardInHeight);
 		}
 
 		private void PostFinishFadeOutTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
 		{
-			LowerDisplayTransitionOut();
-			HudTransitionOut();
+			TransitionNonScoreboardElementsOut();
 		}
 
 		private void PostStartFadeOutTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
 		{
-			LowerDisplayTransitionOut();
+			LowerDisplayTransition.TransitionOut();
 		}
 
 		private void AppendHandlers()
@@ -295,7 +330,9 @@ namespace Overlay
 
 			PostStartFadeOutTimer.Start();
 
-			HudTransitionIn();
+			HudTransition.TransitionIn();
+
+			ScoreboardTransition.TransitionOut();
 		}
 
 		private void HandleSetPlayingTeam(InitRoutineData startData)
@@ -304,15 +341,15 @@ namespace Overlay
 			RoutineLengthMinutes = startData.RoutineLengthMinutes;
 			SplitPoints = 0f;
 
-			LowerDisplayTransitionIn();
+			LowerDisplayTransition.TransitionIn();
 		}
 
 		private void HandleCancelRoutine(string param)
 		{
 			RoutineTimer.StopRoutine();
 
-			LowerDisplayTransitionIn();
-			HudTransitionOut();
+			LowerDisplayTransition.TransitionIn();
+			HudTransition.TransitionOut();
 		}
 
 		private void HandleServerResults(ScoreboardResultsData results)
@@ -336,6 +373,8 @@ namespace Overlay
 					previousPoints = result.TotalPoints;
 				}
 
+				UpdateDisplayRows();
+
 				NotifyPropertyChanged("LowerDisplayText");
 			}));
 		}
@@ -357,6 +396,8 @@ namespace Overlay
 
 					++i;
 				}
+
+				UpdateDisplayRows();
 			}));
 		}
 
@@ -368,130 +409,162 @@ namespace Overlay
 			}));
 		}
 
-		private void LowerDisplayTransitionTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+		private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
 		{
-			LowerDisplayTransitionTime += UpdateIntervalMS / 1000f;
+			NotifyPropertyChanged("TeamDisplayHeight");
+			NotifyPropertyChanged("ScoreboardHeight");
+		}
 
-			double t = LowerDisplayTransitionTime / TransitionLength;
-			if (t >= 1)
+		void UpdateDisplayRows()
+		{
+			DisplayRows.Clear();
+
+			if (ResultsList.Count > 0)
 			{
-				LowerDisplayHeight = LowerDisplayTargetHeight;
-				LowerDisplayTextAlpha = LowerDisplayTargetAlpha;
+				OutputRow results = new OutputRow();
+				results.String1 = "Results";
+				results.String1ColumnSpan = 5;
+				results.BgColor = Brushes.LightGray;
+				DisplayRows.Add(results);
 
-				LowerDisplayTransitionTimer.Stop();
-
-				LowerDisplayState = LowerDisplayState == DisplayState.TransitionIn ? DisplayState.In : DisplayState.Out;
-			}
-			else if (t >= .5)
-			{
-				if (LowerDisplayState == DisplayState.TransitionIn)
+				foreach (TeamResultsData result in ResultsList)
 				{
-					LowerDisplayHeight = LowerDisplayTargetHeight;
-					LowerDisplayTextAlpha = ((t - .5) / .5);
+					OutputRow row = new OutputRow(result);
+					DisplayRows.Add(row);
+				}
+			}
+
+			if (UpNextList.Count > 0)
+			{
+				OutputRow upNextRow = new OutputRow();
+				upNextRow.String1 = "Up Next";
+				upNextRow.String1ColumnSpan = 5;
+				upNextRow.BgColor = Brushes.LightGray;
+				DisplayRows.Add(upNextRow);
+
+				foreach (UpNextData upNext in UpNextList)
+				{
+					OutputRow row = new OutputRow(upNext);
+					DisplayRows.Add(row);
+				}
+			}
+
+			NotifyPropertyChanged("DisplayRows");
+		}
+
+		private void Window_KeyDown(object sender, KeyEventArgs e)
+		{
+			if (e.Key == Key.Space)
+			{
+				if (ScoreboardTransition.State != DisplayState.Out)
+				{
+					ScoreboardTransition.TransitionOut();
 				}
 				else
 				{
-					LowerDisplayTextAlpha = LowerDisplayTargetAlpha;
-					LowerDisplayHeight = (1 - ((t - .5) / .5)) * LowerDisplayInHeight;
+					ScoreboardTransition.TransitionIn();
+
+					TransitionNonScoreboardElementsOut();
+				}
+			}
+		}
+
+		private void TransitionNonScoreboardElementsOut()
+		{
+			LowerDisplayTransition.TransitionOut();
+			HudTransition.TransitionOut();
+		}
+	}
+
+	public class TransitionInstance
+	{
+		System.Timers.Timer UpdateTimer = new System.Timers.Timer();
+		Action<double> UpdateOpacity;
+		Action<double> UpdateHeight;
+		double FullHeight = 0;
+		double TargetHeight = 0;
+		double TargetOpacity = 0;
+		double UpdateIntervalMS = 30;
+		double TransitionTime = 0;
+		double TransitionLength = 1f;
+		public DisplayState State = DisplayState.Out;
+
+		public TransitionInstance(Action<double> updateOpacity, Action<double> updateHeight, double targetHeight)
+		{
+			FullHeight = targetHeight;
+			UpdateOpacity = updateOpacity;
+			UpdateHeight = updateHeight;
+
+			UpdateTimer.AutoReset = true;
+			UpdateTimer.Elapsed += UpdateTimer_Elapsed;
+			UpdateTimer.Interval = UpdateIntervalMS;
+		}
+
+		private void UpdateTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+		{
+			TransitionTime += UpdateIntervalMS / 1000f;
+
+			double t = TransitionTime / TransitionLength;
+			if (t >= 1)
+			{
+				UpdateHeight(TargetHeight);
+				UpdateOpacity(TargetOpacity);
+
+				UpdateTimer.Stop();
+
+				State = State == DisplayState.TransitionIn ? DisplayState.In : DisplayState.Out;
+			}
+			else if (t >= .5)
+			{
+				if (State == DisplayState.TransitionIn)
+				{
+					UpdateHeight(TargetHeight);
+					UpdateOpacity(((t - .5) / .5));
+				}
+				else
+				{
+					UpdateOpacity(TargetOpacity);
+					UpdateHeight((1 - ((t - .5) / .5)) * FullHeight);
 				}
 			}
 			else
 			{
-				if (LowerDisplayState == DisplayState.TransitionIn)
+				if (State == DisplayState.TransitionIn)
 				{
-					LowerDisplayHeight = (t / .5) * LowerDisplayInHeight;
+					UpdateHeight((t / .5) * FullHeight);
 				}
 				else
 				{
-					LowerDisplayTextAlpha = (1 - (t / .5));
+					UpdateOpacity((1 - (t / .5)));
 				}
 			}
 		}
 
-		private void HudTransitionTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+		public void TransitionIn()
 		{
-			HudTransitionTime += UpdateIntervalMS / 1000f;
-
-			double t = HudTransitionTime / TransitionLength;
-			if (t >= 1)
+			if (State != DisplayState.In && State != DisplayState.TransitionIn)
 			{
-				HudHeight = HudTargetHeight;
-				HudTextAlpha = HudTargetAlpha;
+				UpdateOpacity(0);
+				TargetHeight = FullHeight;
+				TargetOpacity = 1f;
+				TransitionTime = 0f;
+				State = DisplayState.TransitionIn;
 
-				HudTransitionTimer.Stop();
-
-				HudState = HudState == DisplayState.TransitionIn ? DisplayState.In : DisplayState.Out;
+				UpdateTimer.Start();
 			}
-			else if (t >= .5)
+		}
+
+		public void TransitionOut()
+		{
+			if (State != DisplayState.Out && State != DisplayState.TransitionOut)
 			{
-				if (HudState == DisplayState.TransitionIn)
-				{
-					HudHeight = HudTargetHeight;
-					HudTextAlpha = ((t - .5) / .5);
-				}
-				else
-				{
-					HudTextAlpha = HudTargetAlpha;
-					HudHeight = (1 - ((t - .5) / .5)) * HudInHeight;
-				}
+				TargetHeight = 0;
+				TargetOpacity = 0;
+				TransitionTime = 0f;
+				State = DisplayState.TransitionOut;
+
+				UpdateTimer.Start();
 			}
-			else
-			{
-				if (HudState == DisplayState.TransitionIn)
-				{
-					HudHeight = (t / .5) * HudInHeight;
-				}
-				else
-				{
-					HudTextAlpha = (1 - (t / .5));
-				}
-			}
-		}
-
-		public void LowerDisplayTransitionIn()
-		{
-			LowerDisplayTextAlpha = 0f;
-			LowerDisplayTargetHeight = LowerDisplayInHeight;
-			LowerDisplayTargetAlpha = 1f;
-			LowerDisplayTransitionTime = 0f;
-			LowerDisplayState = DisplayState.TransitionIn;
-
-			LowerDisplayTransitionTimer.Start();
-
-			NotifyPropertyChanged("LowerDisplayText");
-		}
-
-		public void LowerDisplayTransitionOut()
-		{
-			LowerDisplayTargetHeight = 0;
-			LowerDisplayTargetAlpha = 0;
-			LowerDisplayTransitionTime = 0f;
-			LowerDisplayState = DisplayState.TransitionOut;
-
-			LowerDisplayTransitionTimer.Start();
-
-			NotifyPropertyChanged("LowerDisplayText");
-		}
-
-		public void HudTransitionIn()
-		{
-			HudTextAlpha = 0f;
-			HudTargetHeight = HudInHeight;
-			HudTargetAlpha = 1f;
-			HudTransitionTime = 0f;
-			HudState = DisplayState.TransitionIn;
-
-			HudTransitionTimer.Start();
-		}
-
-		public void HudTransitionOut()
-		{
-			HudTargetHeight = 0;
-			HudTargetAlpha = 0;
-			HudTransitionTime = 0f;
-			HudState = DisplayState.TransitionOut;
-
-			HudTransitionTimer.Start();
 		}
 	}
 
@@ -502,5 +575,94 @@ namespace Overlay
 		TransitionIn,
 		TransitionOut,
 		Max
+	}
+
+	public class OutputRow : INotifyPropertyChanged
+	{
+		public event PropertyChangedEventHandler PropertyChanged;
+		private void NotifyPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] String propertyName = "")
+		{
+			if (PropertyChanged != null)
+			{
+				PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+			}
+		}
+
+		string[] strings = new string[4];
+		public string String1
+		{
+			get { return strings[0]; }
+			set
+			{
+				strings[0] = value;
+				NotifyPropertyChanged("String1");
+			}
+		}
+		public string String2
+		{
+			get { return strings[1]; }
+			set
+			{
+				strings[1] = value;
+				NotifyPropertyChanged("String2");
+			}
+		}
+		public string String3
+		{
+			get { return strings[2]; }
+			set
+			{
+				strings[2] = value;
+				NotifyPropertyChanged("String3");
+			}
+		}
+		public string String4
+		{
+			get { return strings[3]; }
+			set
+			{
+				strings[3] = value;
+				NotifyPropertyChanged("String4");
+			}
+		}
+		int string1ColumnSpan = 1;
+		public int String1ColumnSpan
+		{
+			get { return string1ColumnSpan; }
+			set
+			{
+				string1ColumnSpan = value;
+				NotifyPropertyChanged("String1ColumnSpan");
+			}
+		}
+		Brush bgColor = null;
+		public Brush BgColor
+		{
+			get { return bgColor; }
+			set
+			{
+				bgColor = value;
+				NotifyPropertyChanged("BgColor");
+			}
+		}
+
+		public OutputRow()
+		{
+		}
+
+		public OutputRow(TeamResultsData result)
+		{
+			String1 = result.RankString;
+			String2 = result.PlayerNames;
+			String3 = result.TotalPointsString;
+			String4 = result.DeltaPointsString;
+		}
+
+		public OutputRow(UpNextData upNext)
+		{
+			String1 = upNext.OnDeckNumberString;
+			String2 = upNext.PlayerNames;
+			String4 = upNext.EstimatedTimeToPlayString;
+		}
 	}
 }

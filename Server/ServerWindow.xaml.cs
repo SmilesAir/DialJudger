@@ -249,6 +249,11 @@ namespace Server
 
 		private void SendSplitTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
 		{
+			SendSplitToClients();
+		}
+
+		private void SendSplitToClients()
+		{
 			float totalPoints = 0f;
 
 			foreach (ClientData cd in Clients.Clients)
@@ -652,9 +657,15 @@ namespace Server
 				connection.SendObject("ServerCancelRoutine", "");
 			}
 
-			SendSplitTimer.Stop();
+			StopSendingSplits();
 
 			StopTimeCallTimers();
+		}
+
+		void StopSendingSplits()
+		{
+			SendSplitToClients();
+			SendSplitTimer.Stop();
 		}
 
 		void UpdateJudgesForClients()
@@ -948,7 +959,7 @@ namespace Server
 
 		public void OnFinishRoutineTimer()
 		{
-			SendSplitTimer.Stop();
+			StopSendingSplits();
 
 			NotifyPropertyChanged("TimeRemainingString");
 			NotifyPropertyChanged("StartButtonText");
