@@ -42,6 +42,7 @@ namespace CommonClasses
 		public static float InvalidScore = -1f;
 		public static int InvalidNumberId = -1;
 		public static float BetweenTeamBufferMinutes = 1f;
+		public static IPAddress BroadcastIP = IPAddress.Parse("192.255.255.255");
 	}
 
 	public enum EClientType
@@ -521,7 +522,7 @@ namespace CommonClasses
 		private void BroadcastFindServer()
 		{
 			IPEndPoint ipEndPoint = Connection.ExistingLocalListenEndPoints(ConnectionType.UDP)[0] as IPEndPoint;
-			UDPConnection.SendObject("BroadcastFindServer", ipEndPoint.Port, new IPEndPoint(IPAddress.Broadcast, 10000));
+			UDPConnection.SendObject("BroadcastFindServer", ipEndPoint.Port, new IPEndPoint(CommonValues.BroadcastIP, 10000));
 		}
 
 		private void OnConnectionEstablished(Connection connection)

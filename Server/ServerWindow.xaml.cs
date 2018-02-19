@@ -323,7 +323,7 @@ namespace Server
 
 		private void HandleBroadcastFindServer(PacketHeader header, Connection connection, int port)
 		{
-			UDPConnection.SendObject("BroadcastServerInfo", ListeningUrl, new IPEndPoint(IPAddress.Broadcast, port));
+			UDPConnection.SendObject("BroadcastServerInfo", ListeningUrl, new IPEndPoint(CommonValues.BroadcastIP, port));
 		}
 
 		private static void HandleClientConnect(PacketHeader header, Connection connection, ClientIdData clientInfo)
