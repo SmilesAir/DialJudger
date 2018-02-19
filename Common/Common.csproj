@@ -36,8 +36,9 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="NetworkCommsDotNetComplete">
-      <HintPath>..\..\TestNetworkComms\NetworkCommsDotNetComplete.dll</HintPath>
+    <Reference Include="NetworkCommsDotNetComplete, Version=3.0.0.0, Culture=neutral, PublicKeyToken=f58108eb6480f6ec, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>.\NetworkCommsDotNetComplete.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

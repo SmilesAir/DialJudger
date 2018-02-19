@@ -520,6 +520,7 @@ namespace CommonClasses
 		private void DiscoverPeersTimer_Elapsed(object sender, ElapsedEventArgs e)
 		{
 			PeerDiscovery.DiscoverPeersAsync(PeerDiscovery.DiscoveryMethod.UDPBroadcast);
+
 		}
 
 		private void PeerDiscovery_OnPeerDiscovered(ShortGuid peerIdentifier, Dictionary<ConnectionType, List<EndPoint>> discoveredListenerEndPoints)
