@@ -72,6 +72,7 @@ namespace Server
 		float StartAfterCancelTimeLimit = .75f;
 		List<System.Timers.Timer> TimeCallTimers = new List<System.Timers.Timer>();
 		SpeechSynthesizer Speech = new SpeechSynthesizer();
+		public bool bInvalidSave = false;
 
 		public string NowPlayingString
 		{
@@ -888,28 +889,39 @@ namespace Server
 
 		void Save()
 		{
-			try
+			if (bInvalidSave)
 			{
-				XmlSerializer serializer = new XmlSerializer(typeof(SaveData));
-				using (StringWriter retString = new StringWriter())
-				{
-					serializer.Serialize(retString, SaveDataInst);
-					using (StreamWriter saveFile = new StreamWriter(SaveFilename))
-					{
-						saveFile.Write(retString.ToString());
-					}
-
-					SaveLastFilenamePath();
-				}
+				DoSaveAsDialog();
 			}
-			catch (Exception e)
+			else
 			{
-				MessageBox.Show("Failed to Save.\r\n" + e.Message, "Attention!");
+				try
+				{
+					XmlSerializer serializer = new XmlSerializer(typeof(SaveData));
+					using (StringWriter retString = new StringWriter())
+					{
+						serializer.Serialize(retString, SaveDataInst);
+						using (StreamWriter saveFile = new StreamWriter(SaveFilename))
+						{
+							saveFile.Write(retString.ToString());
+						}
+
+						SaveLastFilenamePath();
+
+						this.Title = "Server - " + SaveFilename;
+					}
+				}
+				catch (Exception e)
+				{
+					MessageBox.Show("Failed to Save.\r\n" + e.Message, "Attention!");
+				}
 			}
 		}
 
 		void Load()
 		{
+			this.Title = "Server - " + SaveFilename;
+
 			try
 			{
 				SaveDataInst.ClearData();
@@ -1038,6 +1050,8 @@ namespace Server
 			{
 				SaveFilename = ofd.FileName;
 
+				bInvalidSave = false;
+
 				Load();
 			}
 		}
@@ -1051,23 +1065,44 @@ namespace Server
 
 			if (ofd.ShowDialog() == true)
 			{
-
-				if (SaveDataInst.TeamList.Count > 0)
+				if (SaveDataInst.TeamList.Count == 0 ||
+					MessageBox.Show("Overwrite Current Data?", "Attention!", MessageBoxButton.YesNoCancel) == MessageBoxResult.Yes)
 				{
-					if (MessageBox.Show("Overwrite Current Data?", "Attention!", MessageBoxButton.YesNoCancel) == MessageBoxResult.Yes)
+					try
 					{
-						try
+						using (StreamReader file = new StreamReader(ofd.FileName))
 						{
-							using (StreamReader file = new StreamReader(ofd.FileName))
-							{
-								ImportTeamsFromText(file.ReadToEnd());
-							}
-						}
-						catch
-						{
+							bInvalidSave = true;
+
+							ImportTeamsFromText(file.ReadToEnd());
 						}
 					}
+					catch
+					{
+					}
 				}
+			}
+		}
+
+		private void SaveAsItem_Click(object sender, RoutedEventArgs e)
+		{
+			DoSaveAsDialog();
+		}
+
+		private void DoSaveAsDialog()
+		{
+			Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog();
+			dlg.FileName = "DialJudgerServerSave";
+			dlg.DefaultExt = ".txt";
+			dlg.Filter = "Text documents (.txt)|*.txt";
+
+			if (dlg.ShowDialog() == true)
+			{
+				SaveFilename = dlg.FileName;
+
+				bInvalidSave = false;
+
+				Save();
 			}
 		}
 	}

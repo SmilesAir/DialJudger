@@ -63,10 +63,10 @@
 
         <Menu>
             <MenuItem Header="_File">
-                <MenuItem Header="_Import" Click="Import_Click"/>
+                <MenuItem Header="_Import Teams/Judges" Click="Import_Click"/>
                 <MenuItem Header="_Open" Click="Open_Click"/>
                 <MenuItem Header="_Save" Click="SaveButton_Click"/>
-                <MenuItem Header="S_ave As"/>
+                <MenuItem Header="S_ave As" Click="SaveAsItem_Click"/>
                 <MenuItem Header="E_xit" Click="MenuItemExit_Click"/>
             </MenuItem>
             <MenuItem Header="_Settings"/>
