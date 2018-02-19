@@ -201,6 +201,8 @@ namespace Server
 				SaveFilename = Properties.Settings.Default.LastSaveFilenamePath;
 			}
 
+			this.WindowState = Properties.Settings.Default.WindowMaximized ? WindowState.Maximized : this.WindowState;
+
 			Speech.SetOutputToDefaultAudioDevice();
 
 			InitializeComponent();
@@ -444,6 +446,9 @@ namespace Server
 
 		private void Window_Closed(object sender, EventArgs e)
 		{
+			Properties.Settings.Default.WindowMaximized = this.WindowState == WindowState.Maximized;
+			Properties.Settings.Default.Save();
+
 			Save();
 
 			NetworkComms.Shutdown();

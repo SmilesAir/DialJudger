@@ -274,6 +274,8 @@ namespace Client
 		{
 			InitializeComponent();
 
+			this.WindowState = Properties.Settings.Default.WindowMaximized ? WindowState.Maximized : this.WindowState;
+
 			ClientCon = new ClientConnection(newClientId => OnClientIdChanged(newClientId));
 
 			ClientWindow = this;
@@ -343,6 +345,9 @@ namespace Client
 
 		private void Window_Closed(object sender, EventArgs e)
 		{
+			Properties.Settings.Default.WindowMaximized = this.WindowState == WindowState.Maximized;
+			Properties.Settings.Default.Save();
+
 			NetworkComms.Shutdown();
 
 			UnHook();
