@@ -246,28 +246,11 @@ namespace Server
 
 			this.DataContext = this;
 
-			//TeamData td = new TeamData();
-			//td.PlayerNames.Add("Ryan Young");
-			//td.PlayerNames.Add("James Wiseman");
-			//SaveDataInst.TeamList.Add(td);
-			//td = new TeamData();
-			//td.PlayerNames.Add("Jake Gauthier");
-			//td.PlayerNames.Add("Arthur Coddington");
-			//SaveDataInst.TeamList.Add(td);
-			//SetPlayingTeam(SaveDataInst.TeamList[0]);
-
-			Connection.StartListening(ConnectionType.UDP, new IPEndPoint(IPAddress.Any, 10000));
-
 			//Start listening for incoming connections
-			Connection.StartListening(ConnectionType.TCP, new System.Net.IPEndPoint(System.Net.IPAddress.Any, 0));
+			Connection.StartListening(ConnectionType.TCP, new System.Net.IPEndPoint(System.Net.IPAddress.Any, 0), true);
 
-#if DEBUG
-			Console.WriteLine("Server listening for TCP connection on:");
-			foreach (System.Net.IPEndPoint localEndPoint in Connection.ExistingLocalListenEndPoints(ConnectionType.TCP))
-			{
-				ListeningUrl = localEndPoint.Address + ":" + localEndPoint.Port;
-			}
-#else
+			NetworkCommsDotNet.Tools.PeerDiscovery.EnableDiscoverable(NetworkCommsDotNet.Tools.PeerDiscovery.DiscoveryMethod.UDPBroadcast);
+
 			using (System.Net.Sockets.Socket socket =
 				new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Dgram, 0))
 			{
@@ -275,7 +258,6 @@ namespace Server
 				IPEndPoint endPoint = socket.LocalEndPoint as IPEndPoint;
 				ListeningUrl = endPoint.ToString();
 			}
-#endif
 
 			Load();
 
@@ -314,16 +296,10 @@ namespace Server
 			NetworkComms.AppendGlobalConnectionEstablishHandler(OnConnectionEstablished);
 			NetworkComms.AppendGlobalConnectionCloseHandler(OnConnectionClosed);
 
-			NetworkComms.AppendGlobalIncomingPacketHandler<int>("BroadcastFindServer", (header, connection, port) => { HandleBroadcastFindServer(header, connection, port); });
 			NetworkComms.AppendGlobalIncomingPacketHandler<ClientIdData>("ClientConnect", HandleClientConnect);
 			NetworkComms.AppendGlobalIncomingPacketHandler<ScoreSplitData>("JudgeScoreUpdate", HandleJudgeScoreUpdate);
 			NetworkComms.AppendGlobalIncomingPacketHandler<DialRoutineScoreData>("JudgeFinishedScore", HandleJudgeFinishedScore);
 			NetworkComms.AppendGlobalIncomingPacketHandler<DialRoutineScoreData>("JudgeSendBackupScore", HandleJudgeSendBackupScore);
-		}
-
-		private void HandleBroadcastFindServer(PacketHeader header, Connection connection, int port)
-		{
-			UDPConnection.SendObject("BroadcastServerInfo", ListeningUrl, new IPEndPoint(CommonValues.BroadcastIP, port));
 		}
 
 		private static void HandleClientConnect(PacketHeader header, Connection connection, ClientIdData clientInfo)
@@ -365,6 +341,17 @@ namespace Server
 			{
 				ServerWindow.SetTeamScore(score);
 			}));
+		}
+
+		private void SendObject<T>(string rpcName, T obj)
+		{
+			foreach (Connection connection in NetworkComms.GetExistingConnection())
+			{
+				if (connection.ConnectionInfo.ConnectionType == ConnectionType.TCP)
+				{
+					connection.SendObject(rpcName, obj);
+				}
+			}
 		}
 
 		public void SetTeamScore(DialRoutineScoreData score)
@@ -529,10 +516,8 @@ namespace Server
 				}
 
 				InitRoutineData routineData = new InitRoutineData(playingTeam == null ? "No Team" : playingTeam.PlayerNamesString, RoutineLengthMinutes);
-				foreach (Connection connection in NetworkComms.GetExistingConnection())
-				{
-					connection.SendObject("ServerSetPlayingTeam", routineData);
-				}
+
+				SendObject("ServerSetPlayingTeam", routineData);
 
 				SendUpdatesToExternalDisplay();
 			}

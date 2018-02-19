@@ -10,6 +10,7 @@ using System.Timers;
 using NetworkCommsDotNet.Connections.UDP;
 using NetworkCommsDotNet;
 using System.ComponentModel;
+using NetworkCommsDotNet.Tools;
 
 namespace CommonClasses
 {
@@ -457,8 +458,7 @@ namespace CommonClasses
 
 	public class ClientConnection
 	{
-		System.Timers.Timer BroadcastTimer = new System.Timers.Timer();
-
+		Timer DiscoverPeersTimer = new Timer();
 		bool bIsConnected = false;
 		public bool IsConnected
 		{
@@ -469,11 +469,11 @@ namespace CommonClasses
 
 				if (bIsConnected)
 				{
-					BroadcastTimer.Stop();
+					DiscoverPeersTimer.Stop();
 				}
 				else
 				{
-					BroadcastTimer.Start();
+					DiscoverPeersTimer.Start();
 				}
 			}
 		}
@@ -491,6 +491,7 @@ namespace CommonClasses
 			}
 		}
 		Action<ClientIdData> OnClientIdChanged;
+		Dictionary<ShortGuid, Dictionary<ConnectionType, List<EndPoint>>> DiscoveredPeers = new Dictionary<ShortGuid, Dictionary<ConnectionType, List<EndPoint>>>();
 
 		public ClientConnection(Action<ClientIdData> onClientIdChanged)
 		{
@@ -499,50 +500,69 @@ namespace CommonClasses
 
 		public void StartConnection(EClientType type)
 		{
+			DiscoverPeersTimer.AutoReset = true;
+			DiscoverPeersTimer.Interval = 1000;
+			DiscoverPeersTimer.Elapsed += DiscoverPeersTimer_Elapsed;
+			DiscoverPeersTimer.Start();
+
 			ClientId = new ClientIdData(Environment.MachineName, CommonDebug.GetOptionalNumberId(), type);
 
-			BroadcastTimer.Interval = 1000;
-			BroadcastTimer.AutoReset = true;
-			BroadcastTimer.Elapsed += BroadcastTimer_Elapsed;
-			BroadcastTimer.Start();
+			PeerDiscovery.EnableDiscoverable(PeerDiscovery.DiscoveryMethod.UDPBroadcast);
+
+			PeerDiscovery.OnPeerDiscovered += PeerDiscovery_OnPeerDiscovered;
+
+			PeerDiscovery.DiscoverPeersAsync(PeerDiscovery.DiscoveryMethod.UDPBroadcast);
 
 			NetworkComms.AppendGlobalConnectionEstablishHandler(conn => OnConnectionEstablished(conn));
 			NetworkComms.AppendGlobalConnectionCloseHandler(conn => OnConnectionClosed(conn));
-			NetworkComms.AppendGlobalIncomingPacketHandler<string>("BroadcastServerInfo",
-				(header, connection, serverInfo) => HandleBroadcastServerInfo(header, connection, serverInfo));
-
-			Connection.StartListening(ConnectionType.UDP, new IPEndPoint(IPAddress.Any, 0), true);
 		}
 
-		private void BroadcastTimer_Elapsed(object sender, ElapsedEventArgs e)
+		private void DiscoverPeersTimer_Elapsed(object sender, ElapsedEventArgs e)
 		{
-			BroadcastFindServer();
+			PeerDiscovery.DiscoverPeersAsync(PeerDiscovery.DiscoveryMethod.UDPBroadcast);
 		}
 
-		private void BroadcastFindServer()
+		private void PeerDiscovery_OnPeerDiscovered(ShortGuid peerIdentifier, Dictionary<ConnectionType, List<EndPoint>> discoveredListenerEndPoints)
 		{
-			IPEndPoint ipEndPoint = Connection.ExistingLocalListenEndPoints(ConnectionType.UDP)[0] as IPEndPoint;
-			UDPConnection.SendObject("BroadcastFindServer", ipEndPoint.Port, new IPEndPoint(CommonValues.BroadcastIP, 10000));
+			if (!IsConnected)
+			{
+				foreach (KeyValuePair<ConnectionType, List<EndPoint>> connection in discoveredListenerEndPoints)
+				{
+					if (connection.Key == ConnectionType.TCP)
+					{
+						foreach (EndPoint ep in connection.Value)
+						{
+							if (IsConnected)
+							{
+								break;
+							}
+
+							IPEndPoint ipEndPoint = ep as IPEndPoint;
+							NetworkComms.SendObject("ClientConnect", ipEndPoint.Address.ToString(), ipEndPoint.Port, ClientId);
+						}
+					}
+				}
+			}
 		}
 
 		private void OnConnectionEstablished(Connection connection)
 		{
-			IsConnected = true;
+			if (connection.ConnectionInfo.ConnectionType == ConnectionType.TCP)
+			{
+				IsConnected = true;
 
-			Connection.StopListening();
-		}
-
-		private void HandleBroadcastServerInfo(PacketHeader header, Connection connection, string serverInfo)
-		{
-			ServerIp = serverInfo.Split(':').First();
-			ServerPort = int.Parse(serverInfo.Split(':').Last());
-
-			NetworkComms.SendObject("ClientConnect", ServerIp, ServerPort, ClientId);
+				IPEndPoint ipEndPoint = connection.ConnectionInfo.RemoteEndPoint as IPEndPoint;
+				ServerIp = ipEndPoint.Address.ToString();
+				ServerPort = ipEndPoint.Port;
+			}
 		}
 
 		private void OnConnectionClosed(Connection connection)
 		{
-			IsConnected = false;
+			if (connection.ConnectionInfo.ConnectionType == ConnectionType.TCP)
+			{
+				IsConnected = false;
+			}
 		}
 	}
 
