@@ -34,10 +34,30 @@ namespace Server
 	{
 		public static MainWindow ServerWindow = null;
 		System.Timers.Timer SendSplitTimer = new System.Timers.Timer();
-		static string ListeningUrl = "";
+		string listeningUrl = "";
+		public string ListeningUrl
+		{
+			get { return listeningUrl; }
+			set
+			{
+				listeningUrl = value;
+				NotifyPropertyChanged("ListeningUrl");
+				NotifyPropertyChanged("WindowTitle");
+			}
+		}
 		static public ClientList Clients = new ClientList();
 		SaveData SaveDataInst = new SaveData();
-		public string SaveFilename = "DialJudgerServerSave.txt";
+		string saveFilename = "DialJudgerServerSave.txt";
+		public string SaveFilename
+		{
+			get { return saveFilename; }
+			set
+			{
+				saveFilename = value;
+				NotifyPropertyChanged("SaveFilename");
+				NotifyPropertyChanged("WindowTitle");
+			}
+		}
 		float routineLengthMinutes = .1f;
 		public float RoutineLengthMinutes
 		{
@@ -183,6 +203,10 @@ namespace Server
 				NotifyPropertyChanged("ResultsText");
 			}
 		}
+		public string WindowTitle
+		{
+			get { return "Server - " + ListeningUrl + " - " + SaveFilename; }
+		}
 
 		public event PropertyChangedEventHandler PropertyChanged;
 		private void NotifyPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] String propertyName = "")
@@ -220,7 +244,7 @@ namespace Server
 
 			TeamsControl.ItemsSource = SaveDataInst.TeamList;
 
-			TopLevelGrid.DataContext = this;
+			this.DataContext = this;
 
 			//TeamData td = new TeamData();
 			//td.PlayerNames.Add("Ryan Young");
@@ -237,12 +261,21 @@ namespace Server
 			//Start listening for incoming connections
 			Connection.StartListening(ConnectionType.TCP, new System.Net.IPEndPoint(System.Net.IPAddress.Any, 0));
 
-			//Print out the IPs and ports we are now listening on
+#if DEBUG
 			Console.WriteLine("Server listening for TCP connection on:");
 			foreach (System.Net.IPEndPoint localEndPoint in Connection.ExistingLocalListenEndPoints(ConnectionType.TCP))
 			{
 				ListeningUrl = localEndPoint.Address + ":" + localEndPoint.Port;
 			}
+#else
+			using (System.Net.Sockets.Socket socket =
+				new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Dgram, 0))
+			{
+				socket.Connect("8.8.8.8", 65530);
+				IPEndPoint endPoint = socket.LocalEndPoint as IPEndPoint;
+				ListeningUrl = endPoint.ToString();
+			}
+#endif
 
 			Load();
 
@@ -281,14 +314,14 @@ namespace Server
 			NetworkComms.AppendGlobalConnectionEstablishHandler(OnConnectionEstablished);
 			NetworkComms.AppendGlobalConnectionCloseHandler(OnConnectionClosed);
 
-			NetworkComms.AppendGlobalIncomingPacketHandler<int>("BroadcastFindServer", HandleBroadcastFindServer);
+			NetworkComms.AppendGlobalIncomingPacketHandler<int>("BroadcastFindServer", (header, connection, port) => { HandleBroadcastFindServer(header, connection, port); });
 			NetworkComms.AppendGlobalIncomingPacketHandler<ClientIdData>("ClientConnect", HandleClientConnect);
 			NetworkComms.AppendGlobalIncomingPacketHandler<ScoreSplitData>("JudgeScoreUpdate", HandleJudgeScoreUpdate);
 			NetworkComms.AppendGlobalIncomingPacketHandler<DialRoutineScoreData>("JudgeFinishedScore", HandleJudgeFinishedScore);
 			NetworkComms.AppendGlobalIncomingPacketHandler<DialRoutineScoreData>("JudgeSendBackupScore", HandleJudgeSendBackupScore);
 		}
 
-		private static void HandleBroadcastFindServer(PacketHeader header, Connection connection, int port)
+		private void HandleBroadcastFindServer(PacketHeader header, Connection connection, int port)
 		{
 			UDPConnection.SendObject("BroadcastServerInfo", ListeningUrl, new IPEndPoint(IPAddress.Broadcast, port));
 		}
@@ -912,8 +945,6 @@ namespace Server
 						}
 
 						SaveLastFilenamePath();
-
-						this.Title = "Server - " + SaveFilename;
 					}
 				}
 				catch (Exception e)
@@ -925,8 +956,6 @@ namespace Server
 
 		void Load()
 		{
-			this.Title = "Server - " + SaveFilename;
-
 			try
 			{
 				SaveDataInst.ClearData();
