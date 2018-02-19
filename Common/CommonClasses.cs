@@ -539,7 +539,18 @@ namespace CommonClasses
 							}
 
 							IPEndPoint ipEndPoint = ep as IPEndPoint;
-							NetworkComms.SendObject("ClientConnect", ipEndPoint.Address.ToString(), ipEndPoint.Port, ClientId);
+
+							if (ipEndPoint.Address.ToString().StartsWith("192"))
+							{
+								try
+								{
+									NetworkComms.SendObject("ClientConnect", ipEndPoint.Address.ToString(), ipEndPoint.Port, ClientId);
+								}
+								catch (CommsException ex)
+								{
+									System.Diagnostics.Debug.WriteLine(ex.ToString());
+								}
+							}
 						}
 					}
 				}
