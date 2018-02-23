@@ -23,6 +23,7 @@ Toby Künzel, Harald S.
 Dylan Rocha Pires, Jens Friebe
 Benjamin Edelmann, Benedicte Audet
 
+// Judges
 Emma Kahle, General
 Jill Kemble, General
 Randy Silvey, General
