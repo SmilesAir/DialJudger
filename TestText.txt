@@ -15,4 +15,17 @@ Bob Boulware, General
 Randy Silvey, Difficulty
 
 
+Sascha Höhne, Jakub Kostel
+Christian Lamred, Florian Hess
+Robert Dittrich, Sascha Scherzinger
+Alex Leist, Freddy Finner
+Toby Künzel, Harald S.
+Dylan Rocha Pires, Jens Friebe
+Benjamin Edelmann, Benedicte Audet
+
+Emma Kahle, General
+Jill Kemble, General
+Randy Silvey, General
+
+
 exception files in bins folder
