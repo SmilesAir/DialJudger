@@ -15,13 +15,14 @@ Bob Boulware, General
 Randy Silvey, Difficulty
 
 
-Sascha Höhne, Jakub Kostel
-Christian Lamred, Florian Hess
-Robert Dittrich, Sascha Scherzinger
-Alex Leist, Freddy Finner
+
+Benjamin Edelmann, Benedicte Audet
 Toby Künzel, Harald S.
 Dylan Rocha Pires, Jens Friebe
-Benjamin Edelmann, Benedicte Audet
+Sascha Höhne, Jakub Kostel
+Robert Dittrich, Sascha Scherzinger
+Alex Leist, Freddy Finner
+Christian Lamred, Florian Hess
 
 // Judges
 Emma Kahle, General
