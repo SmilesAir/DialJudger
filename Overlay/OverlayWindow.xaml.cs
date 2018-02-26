@@ -362,6 +362,7 @@ namespace Overlay
 				foreach (ScoreboardTeamResultData result in results.Results)
 				{
 					TeamResultsData scoreboardResult = new TeamResultsData(result);
+					scoreboardResult.RenderGraph(1000, (int)TeamDisplayHeight);
 
 					if (previousPoints != 0f)
 					{
@@ -645,6 +646,16 @@ namespace Overlay
 				NotifyPropertyChanged("BgColor");
 			}
 		}
+		WriteableBitmap graphBmp;
+		public WriteableBitmap GraphBmp
+		{
+			get { return graphBmp; }
+			set
+			{
+				graphBmp = value;
+				NotifyPropertyChanged("GraphBmp");
+			}
+		}
 
 		public OutputRow()
 		{
@@ -656,6 +667,7 @@ namespace Overlay
 			String2 = result.PlayerNames;
 			String3 = result.TotalPointsString;
 			String4 = result.DeltaPointsString;
+			graphBmp = result.GraphBmp;
 		}
 
 		public OutputRow(UpNextData upNext)

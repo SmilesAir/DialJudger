@@ -108,7 +108,7 @@ namespace Client
 			}
 		}
 		SpeechSynthesizer Speech = new SpeechSynthesizer();
-		int volumeValue = 50;
+		int volumeValue = 100;
 		public int VolumeValue
 		{
 			get { return volumeValue; }

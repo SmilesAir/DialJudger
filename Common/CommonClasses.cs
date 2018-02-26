@@ -11,6 +11,11 @@ using NetworkCommsDotNet.Connections.UDP;
 using NetworkCommsDotNet;
 using System.ComponentModel;
 using NetworkCommsDotNet.Tools;
+using System.Collections.ObjectModel;
+using System.Windows.Shapes;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows;
 
 namespace CommonClasses
 {
@@ -43,7 +48,8 @@ namespace CommonClasses
 		public static float InvalidScore = -1f;
 		public static int InvalidNumberId = -1;
 		public static float BetweenTeamBufferMinutes = 1f;
-		public static IPAddress BroadcastIP = IPAddress.Parse("192.255.255.255");
+		public static int GraphBarCount = 100;
+		public static float MaxScorePerSecond = 30f;
 	}
 
 	public enum EClientType
@@ -254,6 +260,45 @@ namespace CommonClasses
 			return total;
 		}
 
+		public float CalcScoreWindow(float startTime, float endTime)
+		{
+			float score = 0f;
+			DialInputData lastInput = new DialInputData();
+			bool bRecordScore = false;
+
+			foreach (DialInputData input in DialInputs)
+			{
+				if (input.TimeSeconds > endTime)
+				{
+					score += (endTime - lastInput.TimeSeconds) * lastInput.DialScore;
+
+					bRecordScore = false;
+
+					break;
+				}
+				else if (!bRecordScore && input.TimeSeconds > startTime)
+				{
+					bRecordScore = true;
+
+					score += (input.TimeSeconds - startTime) * lastInput.DialScore;
+				}
+				else if (bRecordScore)
+				{
+					score += (input.TimeSeconds - lastInput.TimeSeconds) * lastInput.DialScore;
+				}
+
+				lastInput = input;
+			}
+
+			// Get any remaining time after the final input
+			if (bRecordScore)
+			{
+				score += (endTime - lastInput.TimeSeconds) * lastInput.DialScore;
+			}
+
+			return score;
+		}
+
 		public override string GetScoreString()
 		{
 			return GetTotalScore().ToString("0.0");
@@ -266,6 +311,31 @@ namespace CommonClasses
 	}
 
 	[ProtoContract]
+	public class GraphBarData
+	{
+		[ProtoMember(1)]
+		public int Rank = 0;
+		[ProtoMember(2)]
+		public float ScoreNormalized = 0;
+
+		public GraphBarData()
+		{
+		}
+
+		public GraphBarData(int rank, float scoreNormalized)
+		{
+			Rank = rank;
+			ScoreNormalized = scoreNormalized;
+		}
+	}
+	[ProtoContract]
+	public class GraphBarList
+	{
+		[ProtoMember(1)]
+		public List<GraphBarData> GraphData = new List<GraphBarData>();
+	}
+
+	[ProtoContract]
 	public class ScoreboardTeamResultData
 	{
 		[ProtoMember(1)]
@@ -274,6 +344,8 @@ namespace CommonClasses
 		public string PlayerNames = "";
 		[ProtoMember(3)]
 		public float TotalPoints = 0f;
+		[ProtoMember(4)]
+		public GraphBarList GraphData = new GraphBarList();
 	}
 
 	[ProtoContract]
@@ -644,6 +716,17 @@ namespace CommonClasses
 		{
 			get { return (DeltaPoints == 0f ? "" : "Delta: " + DeltaPoints.ToString("0.0")); }
 		}
+		public GraphBarList GraphData = new GraphBarList();
+		WriteableBitmap graphBmp;
+		public WriteableBitmap GraphBmp
+		{
+			get { return graphBmp; }
+			set
+			{
+				graphBmp = value;
+				NotifyPropertyChanged("GraphBmp");
+			}
+		}
 
 		public TeamResultsData()
 		{
@@ -654,6 +737,91 @@ namespace CommonClasses
 			Rank = teamResult.Rank;
 			PlayerNames = teamResult.PlayerNames;
 			TotalPoints = teamResult.TotalPoints;
+
+			GraphData = teamResult.GraphData;
+		}
+
+		public Color GetRankColor(int rank, bool bPrimary)
+		{
+			if (bPrimary)
+			{
+				switch (rank)
+				{
+					case 1:
+						return Brushes.Gold.Color;
+					case 2:
+						return Brushes.DarkGray.Color;
+					case 3:
+						return Brushes.Peru.Color;
+				}
+
+				float t = 1f - (rank - 3f) / 7f;
+				byte r = (byte)(191f - t * 191f);
+				byte g = (byte)(218f - t * 78f);
+				
+				return Color.FromRgb(r, g, 255);
+			}
+			else
+			{
+				switch (rank)
+				{
+					case 1:
+						return Brushes.LightGoldenrodYellow.Color;
+					case 2:
+						return Brushes.Gainsboro.Color;
+					case 3:
+						return Brushes.Wheat.Color;
+				}
+				
+				return Color.FromRgb(209, 234, 255);
+			}
+		}
+
+		public void RenderGraph(int width, int height)
+		{
+			try
+			{
+				GraphBmp = new WriteableBitmap(width, height, 300, 300, PixelFormats.Pbgra32, null);
+
+				GraphBmp.Lock();
+
+				int barWidth = width / CommonValues.GraphBarCount;
+				int startX = 0;
+				int endX = Math.Max(0, barWidth - 1);
+				foreach (GraphBarData barData in GraphData.GraphData)
+				{
+					Color primaryColor = GetRankColor(barData.Rank, true);
+					Color secondaryColor = GetRankColor(barData.Rank, false);
+					int barHeight = (int)Math.Round(height - height * barData.ScoreNormalized);
+
+					unsafe
+					{
+						byte* pBackBuffer = (byte*)GraphBmp.BackBuffer;
+
+						for (int y = 0; y < height; ++y)
+						{
+							for (int x = startX; x <= endX; ++x)
+							{
+								*(pBackBuffer + (y * GraphBmp.BackBufferStride + x * 4)) = y > barHeight ? primaryColor.B : secondaryColor.B;
+								*(pBackBuffer + (y * GraphBmp.BackBufferStride + x * 4) + 1) = y > barHeight ? primaryColor.G : secondaryColor.G;
+								*(pBackBuffer + (y * GraphBmp.BackBufferStride + x * 4) + 2) = y > barHeight ? primaryColor.R : secondaryColor.R;
+								*(pBackBuffer + (y * GraphBmp.BackBufferStride + x * 4) + 3) = 255;
+							}
+						}
+					}
+
+					startX = endX + 1;
+					endX = startX + barWidth - 1;
+				}
+
+				GraphBmp.AddDirtyRect(new Int32Rect(0, 0, width, height));
+
+				GraphBmp.Unlock();
+			}
+			catch (Exception e)
+			{
+				System.Diagnostics.Debug.WriteLine(e.Message);
+			}
 		}
 	}
 }

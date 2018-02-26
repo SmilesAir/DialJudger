@@ -164,6 +164,7 @@ namespace Scoreboard
 				foreach (ScoreboardTeamResultData result in results.Results)
 				{
 					TeamResultsData scoreboardResult = new TeamResultsData(result);
+					scoreboardResult.RenderGraph(1000, (int)TeamDisplayHeight);
 
 					if (previousPoints != 0f)
 					{

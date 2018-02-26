@@ -72,6 +72,7 @@ namespace Server
 				NotifyPropertyChanged("TimeRemainingString");
 			}
 		}
+		public float RoutineLengthSeconds { get { return RoutineLengthMinutes * 60f; } }
 		TeamData currentPlayingTeam = null;
 		public TeamData CurrentPlayingTeam
 		{
@@ -379,11 +380,66 @@ namespace Server
 			}
 		}
 
+		List<GraphBarList> CalcGraphData(List<TeamData> teamList)
+		{
+			List<GraphBarList> retList = new List<GraphBarList>();
+			foreach (TeamData td in teamList)
+			{
+				retList.Add(new GraphBarList());
+			}
+			
+			float barTime = RoutineLengthSeconds / CommonValues.GraphBarCount;
+			float maxScore = CommonValues.MaxScorePerSecond * barTime;
+			for (int barIndex = 0; barIndex < CommonValues.GraphBarCount; ++barIndex)
+			{
+				float startTime = barIndex * barTime;
+				float endTime = barIndex * barTime + barTime;
+				List<Tuple<int, float, float>> sortedBarData = new List<Tuple<int, float, float>>();
+				for (int teamIndex = 0; teamIndex < teamList.Count; ++teamIndex)
+				{
+					float scoreNormalized = Math.Min(1f, teamList[teamIndex].CalcScoreWindow(startTime, endTime) / maxScore);
+					float scoreUpToNow = teamList[teamIndex].CalcScoreWindow(0, endTime);
+					Tuple<int, float, float> newBarData = new Tuple<int, float, float>(teamIndex, scoreNormalized, scoreUpToNow);
+
+					int insertIndex = 0;
+					foreach (Tuple<int, float, float> barData in sortedBarData)
+					{
+						if (scoreUpToNow > barData.Item3)
+						{
+							sortedBarData.Insert(insertIndex, newBarData);
+
+							break;
+						}
+
+						++insertIndex;
+					}
+
+					if (insertIndex == sortedBarData.Count)
+					{
+						sortedBarData.Add(newBarData);
+					}
+				}
+
+				int rank = 1;
+				foreach (Tuple<int, float, float> barData in sortedBarData)
+				{
+					retList[barData.Item1].GraphData.Add(new GraphBarData(rank, barData.Item2));
+
+					++rank;
+				}
+			}
+
+			return retList;
+		}
+
 		void SendResultsToExtenalDisplay()
 		{
 			List<TeamData> sortedTeams = CalcSortedTeams();
 			ScoreboardResultsData results = new ScoreboardResultsData();
 
+			List<GraphBarList> graphBarData = CalcGraphData(sortedTeams);
+
+			int teamIndex = 0;
 			foreach (TeamData team in sortedTeams)
 			{
 				if (!team.IsScratch)
@@ -393,9 +449,12 @@ namespace Server
 					teamResult.PlayerNames = team.PlayerNamesString;
 					teamResult.Rank = team.Rank;
 					teamResult.TotalPoints = team.TotalScore;
+					teamResult.GraphData = graphBarData[teamIndex];
 
 					results.Results.Add(teamResult);
 				}
+
+				++teamIndex;
 			}
 
 			foreach (ClientData cd in Clients.Clients)
@@ -1028,7 +1087,7 @@ namespace Server
 			{
 				float score1Total = team1.TotalScore;
 				int rank = 1;
-				if (team1.Scores.Count > 0 && !team1.IsScratch)
+				if (team1.JudgesScores.Count > 0 && !team1.IsScratch)
 				{
 					foreach (TeamData team2 in SaveDataInst.TeamList)
 					{
@@ -1342,7 +1401,7 @@ namespace Server
 				return ret;
 			}
 		}
-		public List<DialRoutineScoreData> Scores = new List<DialRoutineScoreData>();
+		public List<DialRoutineScoreData> JudgesScores = new List<DialRoutineScoreData>();
 		[XmlIgnoreAttribute]
 		public Action UpdateAllTeamScores;
 		int rank = 0;
@@ -1381,7 +1440,7 @@ namespace Server
 			get
 			{
 				float total = 0f;
-				foreach (DialRoutineScoreData score in Scores)
+				foreach (DialRoutineScoreData score in JudgesScores)
 				{
 					total += score.GetTotalScore();
 				}
@@ -1396,7 +1455,7 @@ namespace Server
 			{
 				string ret = "";
 
-				foreach (DialRoutineScoreData score in Scores)
+				foreach (DialRoutineScoreData score in JudgesScores)
 				{
 					ret += score.JudgeName + ": " + score.GetScoreString() + "  ";
 				}
@@ -1485,13 +1544,13 @@ namespace Server
 
 		public void SetFinishedScore(ObservableCollection<TeamData> teamList, DialRoutineScoreData newScore)
 		{
-			for (int i = 0; i < Scores.Count; ++i)
+			for (int i = 0; i < JudgesScores.Count; ++i)
 			{
-				DialRoutineScoreData score = Scores[i];
+				DialRoutineScoreData score = JudgesScores[i];
 
 				if (score.IsSameInstance(newScore))
 				{
-					Scores[i] = newScore;
+					JudgesScores[i] = newScore;
 
 					UpdateAfterScoreUpdate();
 
@@ -1499,16 +1558,28 @@ namespace Server
 				}
 			}
 
-			Scores.Add(newScore);
+			JudgesScores.Add(newScore);
 
 			UpdateAfterScoreUpdate();
 		}
 
 		public void ClearScores(ObservableCollection<TeamData> teamList)
 		{
-			Scores.Clear();
+			JudgesScores.Clear();
 
 			UpdateAfterScoreUpdate();
+		}
+
+		public float CalcScoreWindow(float startTime, float endTime)
+		{
+			float ret = 0;
+
+			foreach (DialRoutineScoreData scoreData in JudgesScores)
+			{
+				ret += scoreData.CalcScoreWindow(startTime, endTime);
+			}
+
+			return ret;
 		}
 	}
 

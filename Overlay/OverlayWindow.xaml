@@ -99,8 +99,15 @@
                                         <Viewbox Grid.ColumnSpan="{Binding String1ColumnSpan}">
                                             <Label Content="{Binding String1}" Opacity="{Binding Tag.ScoreboardTextOpacity, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}"/>
                                         </Viewbox>
+                                        <Viewbox Grid.Column="1" Grid.ColumnSpan="2" HorizontalAlignment="Left">
+                                            <Image Source="{Binding GraphBmp}" Opacity="{Binding Tag.ScoreboardTextOpacity, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}"/>
+                                        </Viewbox>
                                         <Viewbox Grid.Column="1" HorizontalAlignment="Left">
-                                            <Label Content="{Binding String2}" Opacity="{Binding Tag.ScoreboardTextOpacity, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}"/>
+                                            <Label Content="{Binding String2}" Opacity="{Binding Tag.ScoreboardTextOpacity, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}">
+                                                <Label.Effect>
+                                                    <DropShadowEffect BlurRadius="5" Color="white" ShadowDepth="0" Opacity="1"/>
+                                                </Label.Effect>
+                                            </Label>
                                         </Viewbox>
                                         <Viewbox Grid.Column="3" HorizontalAlignment="Right">
                                             <Label Content="{Binding String3}" Opacity="{Binding Tag.ScoreboardTextOpacity, RelativeSource={RelativeSource  AncestorType={x:Type ItemsControl}}}"/>
