@@ -270,7 +270,14 @@ namespace CommonClasses
 			{
 				if (input.TimeSeconds > endTime)
 				{
-					score += (endTime - lastInput.TimeSeconds) * lastInput.DialScore;
+					if (!bRecordScore)
+					{
+						score = (endTime - startTime) * lastInput.DialScore;
+					}
+					else
+					{
+						score += (endTime - lastInput.TimeSeconds) * lastInput.DialScore;
+					}
 
 					bRecordScore = false;
 

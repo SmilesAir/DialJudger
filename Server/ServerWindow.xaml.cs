@@ -1027,6 +1027,8 @@ namespace Server
 						UpdateResultsText();
 
 						SaveLastFilenamePath();
+
+						SendUpdatesToExternalDisplay();
 					}
 				}
 			}
