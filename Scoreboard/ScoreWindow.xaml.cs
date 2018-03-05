@@ -55,7 +55,7 @@ namespace Scoreboard
 		RoutineTimers RoutineTimer;
 		public double TeamDisplayHeight
 		{
-			get { return ActualHeight / 16f; }
+			get { return ActualHeight / 15f; }
 		}
 		public double PointsDeltaWidth
 		{

@@ -30,7 +30,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
-                <Viewbox Grid.ColumnSpan="2">
+                <Viewbox Margin="10">
                     <!--<Label Content="{Binding TournamentTitle}"/>-->
                     <Image>
                         <Image.Source>

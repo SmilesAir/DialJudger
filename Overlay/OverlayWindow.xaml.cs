@@ -80,7 +80,7 @@ namespace Overlay
 		}
 		double LowerDisplayInHeight
 		{
-			get { return TopLevelGrid.ActualHeight / 4f; }
+			get { return TopLevelGrid.ActualHeight / 6f; }
 		}
 
 		double hudHeight = 0f;
