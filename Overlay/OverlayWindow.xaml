@@ -9,32 +9,32 @@
         Loaded="Window_Loaded"
         SizeChanged="Window_SizeChanged"
         KeyDown="Window_KeyDown">
-    <Grid Name="TopLevelGrid" Background="LightBlue">
+    <Grid Name="TopLevelGrid" Background="LightGreen">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="{Binding LowerDisplayHeight}"/>
+            <RowDefinition Height=".1*"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="1" Background="{Binding BackgroundColor}" BorderBrush="DarkGray" BorderThickness="1" CornerRadius="10">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width=".85*"/>
+                <ColumnDefinition Width=".15*"/>
+                <ColumnDefinition Width=".2*"/>
+            </Grid.ColumnDefinitions>
+            
+            <Viewbox Grid.ColumnSpan="2">
+                <Image Opacity="{Binding LowerDisplayTextOpacity}">
+                    <Image.Source>
+                        <BitmapImage UriSource="/Art/LowerThrids.png"/>
+                    </Image.Source>
+                </Image>
+            </Viewbox>
 
-                <Viewbox Margin="10">
-                    <Image Opacity="{Binding LowerDisplayTextOpacity}">
-                        <Image.Source>
-                            <BitmapImage UriSource="/Art/SquareLogo.png"/>
-                        </Image.Source>
-                    </Image>
-                </Viewbox>
-                
-                <Viewbox Grid.Column="1">
-                    <Label Content="{Binding LowerDisplayText}" Opacity="{Binding LowerDisplayTextOpacity}"/>
-                </Viewbox>
-            </Grid>
-        </Border>
+            <Viewbox HorizontalAlignment="Left">
+                <Label Content="{Binding LowerDisplayText}" Opacity="{Binding LowerDisplayTextOpacity}" Foreground="Wheat"/>
+            </Viewbox>
+        </Grid>
 
         <Grid>
             <Grid.ColumnDefinitions>
