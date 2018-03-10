@@ -9,7 +9,7 @@
         Loaded="Window_Loaded"
         SizeChanged="Window_SizeChanged"
         KeyDown="Window_KeyDown">
-    <Grid Name="TopLevelGrid" Background="LightGreen">
+    <Grid Name="TopLevelGrid" Background="LightBlue">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="{Binding LowerDisplayHeight}"/>

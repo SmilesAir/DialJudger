@@ -15,7 +15,7 @@
     <Border BorderBrush="Gray" BorderThickness="1">
         <Grid Name="TopLevelGrid" Background="AntiqueWhite">
             <Grid.RowDefinitions>
-                <RowDefinition Height="2*"/>
+                <RowDefinition Height="1.5*"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -56,15 +56,19 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <Viewbox HorizontalAlignment="Left">
                     <Label Content="{Binding CurrentPlayingPlayerNames}"/>
                 </Viewbox>
                 <Viewbox Grid.Column="2" HorizontalAlignment="Left">
-                    <Label Content="{Binding SplitPointsString}"/>
+                    <Label Content="{Binding SplitRankString}"/>
                 </Viewbox>
                 <Viewbox Grid.Column="3" HorizontalAlignment="Left">
+                    <Label Content="{Binding SplitPointsString}"/>
+                </Viewbox>
+                <Viewbox Grid.Column="4" HorizontalAlignment="Left">
                     <Label Content="{Binding SplitDeltaPointsString}"/>
                 </Viewbox>
             </Grid>
@@ -97,7 +101,7 @@
                                         <Image Source="{Binding GraphBmp}" Opacity=".75"/>
                                     </Viewbox>
                                     <Viewbox Grid.Column="1" HorizontalAlignment="Left">
-                                        <Label Content="{Binding PlayerNames}">
+                                        <Label Content="{Binding PlayerNames}" FontWeight="UltraBlack">
                                             <Label.Effect>
                                                 <DropShadowEffect BlurRadius="5" Color="white" ShadowDepth="0" Opacity="1"/>
                                             </Label.Effect>

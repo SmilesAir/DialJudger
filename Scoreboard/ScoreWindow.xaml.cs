@@ -55,7 +55,7 @@ namespace Scoreboard
 		RoutineTimers RoutineTimer;
 		public double TeamDisplayHeight
 		{
-			get { return ActualHeight / 15f; }
+			get { return ActualHeight / 14f; }
 		}
 		public double PointsDeltaWidth
 		{
@@ -83,6 +83,7 @@ namespace Scoreboard
 				NotifyPropertyChanged("SplitPoints");
 				NotifyPropertyChanged("SplitPointsString");
 				NotifyPropertyChanged("SplitDeltaPointsString");
+				NotifyPropertyChanged("SplitRankString");
 			}
 		}
 		public string SplitPointsString
@@ -106,6 +107,15 @@ namespace Scoreboard
 		public string RoutineTimeString
 		{
 			get { return RoutineTimer.IsRoutinePlaying ? "Time: " + RoutineTimer.RemainingTimeString : ""; }
+		}
+		public string SplitRankString
+		{
+			get
+			{
+				int rank = GetSplitRank();
+
+				return rank > 0 ? "Current Rank: " + rank.ToString() : "";
+			}
 		}
 
 		public MainWindow()
@@ -233,6 +243,29 @@ namespace Scoreboard
 			{
 				this.WindowStyle = WindowStyle.SingleBorderWindow;
 			}
+		}
+
+		private int GetSplitRank()
+		{
+			int rank = 0;
+
+			if (SplitPoints > 0)
+			{
+				foreach (TeamResultsData result in ResultsList)
+				{
+					++rank;
+					float splitAverage = (float)(result.TotalPoints / (RoutineLengthMinutes * 60f) * RoutineTimer.ElapsedSeconds);
+
+					if (SplitPoints > splitAverage)
+					{
+						return rank;
+					}
+				}
+
+				++rank;
+			}
+
+			return rank;
 		}
 	}
 }
