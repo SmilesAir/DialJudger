@@ -24,6 +24,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.Xml.Serialization;
 using System.Speech.Synthesis;
+using System.Windows.Media.Animation;
 
 namespace Server
 {
@@ -94,6 +95,7 @@ namespace Server
 		List<System.Timers.Timer> TimeCallTimers = new List<System.Timers.Timer>();
 		SpeechSynthesizer Speech = new SpeechSynthesizer();
 		public bool bInvalidSave = false;
+		DateTime LastJudgeUpdateTime = DateTime.Now;
 
 		public string NowPlayingString
 		{
@@ -298,7 +300,7 @@ namespace Server
 			NetworkComms.AppendGlobalConnectionCloseHandler(OnConnectionClosed);
 
 			NetworkComms.AppendGlobalIncomingPacketHandler<ClientIdData>("ClientConnect", HandleClientConnect);
-			NetworkComms.AppendGlobalIncomingPacketHandler<ScoreSplitData>("JudgeScoreUpdate", HandleJudgeScoreUpdate);
+			NetworkComms.AppendGlobalIncomingPacketHandler<ScoreSplitData>("JudgeScoreUpdate", (header, connection, scoreUpdate) => { HandleJudgeScoreUpdate(header, connection, scoreUpdate); });
 			NetworkComms.AppendGlobalIncomingPacketHandler<DialRoutineScoreData>("JudgeFinishedScore", HandleJudgeFinishedScore);
 			NetworkComms.AppendGlobalIncomingPacketHandler<DialRoutineScoreData>("JudgeSendBackupScore", HandleJudgeSendBackupScore);
 		}
@@ -317,11 +319,13 @@ namespace Server
 			}));
 		}
 
-		private static void HandleJudgeScoreUpdate(PacketHeader header, Connection connection, ScoreSplitData scoreUpdate)
+		private void HandleJudgeScoreUpdate(PacketHeader header, Connection connection, ScoreSplitData scoreUpdate)
 		{
 			Application.Current.Dispatcher.Invoke(DispatcherPriority.Normal, new ThreadStart(delegate
 			{
 				Clients.SetLastJudgeScore(scoreUpdate);
+
+				CheckShouldRoutineStart();
 			}));
 		}
 
@@ -377,6 +381,38 @@ namespace Server
 				SendUpdatesToExternalDisplay();
 
 				Save();
+			}
+		}
+
+		void CheckShouldRoutineStart()
+		{
+			if (Clients.Clients.Count > 0 && !IsJudging)
+			{
+				bool bAllJudgesJudging = true;
+				DateTime updateTime = new DateTime();
+				foreach (ClientData cd in Clients.Clients)
+				{
+					if (cd.SecondSinceLastUpdate > 5 || cd.LastJudgeValue <= 0)
+					{
+						bAllJudgesJudging = false;
+						break;
+					}
+					else if (cd.LastUpdateTime > updateTime)
+					{
+						updateTime = cd.LastUpdateTime;
+					}
+				}
+
+				if (bAllJudgesJudging && updateTime > LastJudgeUpdateTime)
+				{
+					LastJudgeUpdateTime = updateTime;
+
+					Storyboard flashStartButton = FindResource("FlashStartButtonButton") as Storyboard;
+					flashStartButton.Begin();
+
+					Speech.SpeakAsyncCancelAll();
+					Speech.SpeakAsync("Do you need to start routine?");
+				}
 			}
 		}
 
@@ -623,6 +659,11 @@ namespace Server
 		{
 			if (CurrentPlayingTeam != null)
 			{
+				Speech.SpeakAsyncCancelAll();
+
+				Storyboard flashStartButton = FindResource("FlashStartButtonButton") as Storyboard;
+				flashStartButton.Stop();
+
 				RoutineTimer.StartRoutine(RoutineLengthMinutes);
 
 				NotifyPropertyChanged("StartButtonText");
@@ -1218,12 +1259,24 @@ namespace Server
 			get { return lastSplit; }
 			set
 			{
+				if (lastSplit == null || !lastSplit.CompareTo(value))
+				{
+					lastUpdateTime = DateTime.Now;
+				}
+
 				lastSplit = value;
 
 				NotifyPropertyChanged("LastSplit");
 				NotifyPropertyChanged("LastJudgeValue");
 				NotifyPropertyChanged("JudgeValue");
+				NotifyPropertyChanged("SecondSinceLastUpdate");
 			}
+		}
+		DateTime lastUpdateTime = new DateTime();
+		public DateTime LastUpdateTime { get { return lastUpdateTime; } }
+		public double SecondSinceLastUpdate
+		{
+			get { return (DateTime.Now - lastUpdateTime).TotalSeconds; }
 		}
 
 		// Display

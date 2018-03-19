@@ -116,6 +116,11 @@ namespace CommonClasses
 			DialValue = score;
 			TotalPoints = totalScore;
 		}
+
+		public bool CompareTo(ScoreSplitData other)
+		{
+			return other != null && DialValue == other.DialValue && TotalPoints == other.TotalPoints;
+		}
 	}
 
 	public enum EDialInput

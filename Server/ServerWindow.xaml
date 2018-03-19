@@ -51,9 +51,21 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <Storyboard x:Key="FlashStartButtonButton" RepeatBehavior="5x">
+            <DoubleAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Opacity)" Storyboard.TargetName="StartButton" Duration="0:0:0:.1">
+                <EasingDoubleKeyFrame KeyTime="50%" Value="0.2"/>
+                <EasingDoubleKeyFrame KeyTime="100%" Value="1"/>
+            </DoubleAnimationUsingKeyFrames>
+
+            <ColorAnimationUsingKeyFrames Storyboard.TargetProperty="Background.Color" Storyboard.TargetName="TopLevelGrid" Duration="0:0:0:.2" FillBehavior="Stop">
+                <EasingColorKeyFrame KeyTime="50%" Value="Red"/>
+                <EasingColorKeyFrame KeyTime="100%" Value="Yellow"/>
+            </ColorAnimationUsingKeyFrames>
+        </Storyboard>
     </Window.Resources>
-    
-    <Grid Name="TopLevelGrid">
+
+    <Grid Name="TopLevelGrid" Background="Transparent">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -206,7 +218,7 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Button Click="StartButton_Click">
+            <Button Click="StartButton_Click" Name="StartButton">
                 <Grid Margin="30">
                     <Viewbox>
                         <Label Content="{Binding StartButtonText}" Foreground="{Binding StartButtonTextColor}"/>
