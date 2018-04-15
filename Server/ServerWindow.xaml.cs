@@ -96,6 +96,7 @@ namespace Server
 		SpeechSynthesizer Speech = new SpeechSynthesizer();
 		public bool bInvalidSave = false;
 		DateTime LastJudgeUpdateTime = DateTime.Now;
+		ResultsAnalyzer Analyzer = new ResultsAnalyzer();
 
 		public string NowPlayingString
 		{
@@ -235,8 +236,29 @@ namespace Server
 			InitializeComponent();
 		}
 
+		private void RunAnalysis()
+		{
+			using (StreamWriter analysisFile = new StreamWriter("Analysis.txt"))
+			{
+				string normalCalc = Analyzer.DoAnalysis(EAnalysisType.Default);
+				string dropHighLowContCalc = Analyzer.DoAnalysis(EAnalysisType.DropHighLowContinuous);
+
+				StringReader normal = new StringReader(normalCalc);
+				StringReader highLowCont = new StringReader(dropHighLowContCalc);
+
+				while (normal.Peek() != -1)
+				{
+					analysisFile.WriteLine(normal.ReadLine() + "\t" + highLowCont.ReadLine());
+				}
+			}
+
+			this.Close();
+		}
+
 		private void Window_Loaded(object sender, RoutedEventArgs e)
 		{
+			//RunAnalysis();
+
 			SendSplitTimer.Interval = 500;
 			SendSplitTimer.AutoReset = true;
 			SendSplitTimer.Elapsed += SendSplitTimer_Elapsed;
@@ -470,7 +492,7 @@ namespace Server
 
 		void SendResultsToExtenalDisplay()
 		{
-			List<TeamData> sortedTeams = CalcSortedTeams();
+			List<TeamData> sortedTeams = SaveDataInst.CalcSortedTeams();
 			ScoreboardResultsData results = new ScoreboardResultsData();
 
 			List<GraphBarList> graphBarData = CalcGraphData(sortedTeams);
@@ -810,39 +832,9 @@ namespace Server
 			}
 		}
 
-		List<TeamData> CalcSortedTeams()
-		{
-			List<TeamData> sortedTeams = new List<TeamData>();
-			foreach (TeamData team in SaveDataInst.TeamList)
-			{
-				if (team.Rank > 0)
-				{
-					if (sortedTeams.Count == 0)
-					{
-						sortedTeams.Add(team);
-					}
-					else
-					{
-						int insertIndex = 0;
-						for (; insertIndex < sortedTeams.Count; ++insertIndex)
-						{
-							if (sortedTeams[insertIndex].Rank > 0 && team.Rank < sortedTeams[insertIndex].Rank)
-							{
-								break;
-							}
-						}
-
-						sortedTeams.Insert(insertIndex, team);
-					}
-				}
-			}
-
-			return sortedTeams;
-		}
-
 		void UpdateResultsText()
 		{
-			List<TeamData> sortedTeams = CalcSortedTeams();
+			List<TeamData> sortedTeams = SaveDataInst.CalcSortedTeams();
 
 			ResultsText = "";
 
@@ -989,7 +981,7 @@ namespace Server
 							// Parse Error
 							bImportError = true;
 
-							MessageBox.Show("Failed to import line (Unknown category):\r\n" + line, "Attention!");
+							MessageBox.Show("Failed to import judge (Unknown category):\r\n" + line + "\r\n\r\nMust be one of General, ArtisticImpression, Difficulty, Execution", "Attention!");
 						}
 					}
 					else
@@ -1649,6 +1641,36 @@ namespace Server
 			TeamList.Clear();
 			ImportedJudges.Clear();
 			RoutineLengthMinutes = 3f;
+		}
+
+		public List<TeamData> CalcSortedTeams()
+		{
+			List<TeamData> sortedTeams = new List<TeamData>();
+			foreach (TeamData team in TeamList)
+			{
+				if (team.Rank > 0)
+				{
+					if (sortedTeams.Count == 0)
+					{
+						sortedTeams.Add(team);
+					}
+					else
+					{
+						int insertIndex = 0;
+						for (; insertIndex < sortedTeams.Count; ++insertIndex)
+						{
+							if (sortedTeams[insertIndex].Rank > 0 && team.Rank < sortedTeams[insertIndex].Rank)
+							{
+								break;
+							}
+						}
+
+						sortedTeams.Insert(insertIndex, team);
+					}
+				}
+			}
+
+			return sortedTeams;
 		}
 	}
 

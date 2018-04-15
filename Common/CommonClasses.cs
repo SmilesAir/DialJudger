@@ -255,6 +255,7 @@ namespace CommonClasses
 				total += timeDelta * first.DialScore;
 			}
 
+			// Finsihed routines have an event at the end, so this if is only for in progress calculations
 			if (routineLengthSeconds > 0f && DialInputs.Count > 0)
 			{
 				DialInputData last = DialInputs.Last();
