@@ -489,8 +489,8 @@ namespace CommonClasses
 		{
 			get
 			{
-				double remainingSeconds = IsRoutinePlaying ? RemainingSeconds : RoutineLengthMinutes * 60f;
-				return string.Format("{0:0}:{1:00}", (int)((remainingSeconds + .1f) / 60), ((int)Math.Round(remainingSeconds)) % 60);
+				int remainingSeconds = (int)(IsRoutinePlaying ? RemainingSeconds : RoutineLengthMinutes * 60f);
+				return string.Format("{0:0}:{1:00}", remainingSeconds / 60, remainingSeconds % 60);
 			}
 		}
 
@@ -502,7 +502,7 @@ namespace CommonClasses
 			FinishRoutineTimer.AutoReset = false;
 			FinishRoutineTimer.Elapsed += FinishRoutineTimer_Elapsed;
 
-			UpdateRoutineTimeTimer.Interval = 1000;
+			UpdateRoutineTimeTimer.Interval = 200;
 			UpdateRoutineTimeTimer.AutoReset = true;
 			UpdateRoutineTimeTimer.Elapsed += UpdateRoutineTimeTimer_Elapsed;
 		}
